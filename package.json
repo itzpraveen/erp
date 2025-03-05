@@ -1,0 +1,24 @@
+{
+  "name": "solar-erp",
+  "version": "1.0.0",
+  "description": "Solar Panel Company ERP System",
+  "main": "index.js",
+  "scripts": {
+    "start": "./start.sh",
+    "setup": "./setup.sh",
+    "dev": "./setup.sh dev",
+    "prod": "./setup.sh prod",
+    "backup": "./setup.sh backup"
+  },
+  "keywords": [
+    "solar",
+    "erp",
+    "management",
+    "crm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+
+}

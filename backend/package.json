@@ -1,0 +1,38 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "data:import": "node src/seeder",
+    "data:destroy": "node src/seeder -d"
+  },
+  "keywords": [
+    "solar",
+    "erp",
+    "management",
+    "crm"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Solar panel company ERP system backend",
+  "dependencies": {
+    "axios": "^1.8.1",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.11.0",
+    "multer": "^1.4.5-lts.1",
+    "react-router-bootstrap": "^0.26.3",
+    "web-vitals": "^4.2.4",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
