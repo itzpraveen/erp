@@ -26,6 +26,7 @@ import {
 } from '../features/proposals/proposalSlice';
 import { getLeads } from '../features/leads/leadSlice';
 import { getLeadById } from '../features/leads/leadSlice';
+import { formatCurrency } from '../utils/formatters/currencyFormatter';
 
 const ProposalDetailsPage = ({ mode }) => {
   const { id } = useParams();
@@ -55,6 +56,7 @@ const ProposalDetailsPage = ({ mode }) => {
     },
     financialDetails: {
       totalCost: '',
+      currency: 'INR',
       incentives: [],
       netCost: '',
       paybackPeriod: '',
@@ -346,14 +348,6 @@ const ProposalDetailsPage = ({ mode }) => {
     }
   };
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   // Create or Edit mode - render form
   if (isCreateMode || isEditMode) {
     return (
@@ -607,17 +601,36 @@ const ProposalDetailsPage = ({ mode }) => {
                     <Card className="mb-4">
                       <Card.Header>Financial Details</Card.Header>
                       <Card.Body>
-                        <Form.Group controlId="financialDetails.totalCost" className="mb-3">
-                          <Form.Label>Total System Cost</Form.Label>
-                          <Form.Control
-                            type="number"
-                            step="0.01"
-                            placeholder="Enter total system cost"
-                            name="financialDetails.totalCost"
-                            value={formData.financialDetails.totalCost}
-                            onChange={handleChange}
-                          />
-                        </Form.Group>
+                        <Row>
+                          <Col md={9}>
+                            <Form.Group controlId="financialDetails.totalCost" className="mb-3">
+                              <Form.Label>Total System Cost (₹)</Form.Label>
+                              <Form.Control
+                                type="number"
+                                step="0.01"
+                                placeholder="Enter total system cost"
+                                name="financialDetails.totalCost"
+                                value={formData.financialDetails.totalCost}
+                                onChange={handleChange}
+                              />
+                            </Form.Group>
+                          </Col>
+                          <Col md={3}>
+                            <Form.Group controlId="financialDetails.currency" className="mb-3">
+                              <Form.Label>Currency</Form.Label>
+                              <Form.Select
+                                name="financialDetails.currency"
+                                value={formData.financialDetails.currency || 'INR'}
+                                onChange={handleChange}
+                              >
+                                <option value="INR">₹ INR</option>
+                                <option value="USD">$ USD</option>
+                                <option value="EUR">€ EUR</option>
+                                <option value="GBP">£ GBP</option>
+                              </Form.Select>
+                            </Form.Group>
+                          </Col>
+                        </Row>
 
                         <Form.Group controlId="incentives" className="mb-3">
                           <Form.Label>Incentives & Rebates</Form.Label>

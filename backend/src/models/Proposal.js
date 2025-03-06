@@ -76,6 +76,11 @@ const financialDetailsSchema = mongoose.Schema(
       type: Number,
       required: true,
     },
+    currency: {
+      type: String,
+      default: 'INR',
+      enum: ['INR', 'USD', 'EUR', 'GBP'],
+    },
     incentives: [incentiveSchema],
     netCost: {
       type: Number,
@@ -180,11 +185,31 @@ proposalSchema.methods.calculateMonthlySavings = function () {
     return 0;
   }
   
-  // Assuming average electricity cost of $0.15 per kWh
-  const electricityRate = 0.15;
+  // Assuming average electricity cost of ₹8 per kWh (Indian electricity rate)
+  const electricityRate = 8;
   const annualProduction = this.systemDetails.estimatedProduction;
   
   return (annualProduction * electricityRate) / 12;
+};
+
+// Format currency based on the currency type
+proposalSchema.methods.formatCurrency = function (amount) {
+  const currency = this.financialDetails?.currency || 'INR';
+  const currencies = {
+    INR: { locale: 'en-IN', symbol: '₹' },
+    USD: { locale: 'en-US', symbol: '$' },
+    EUR: { locale: 'de-DE', symbol: '€' },
+    GBP: { locale: 'en-GB', symbol: '£' },
+  };
+  
+  const { locale, symbol } = currencies[currency];
+  
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 };
 
 const Proposal = mongoose.model('Proposal', proposalSchema);

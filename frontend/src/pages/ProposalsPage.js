@@ -16,6 +16,7 @@ import {
 import Loader from '../components/Loader';
 import Message from '../components/Message';
 import { getProposals, getProposalStats, reset } from '../features/proposals/proposalSlice';
+import { formatCurrency } from '../utils/formatters/currencyFormatter';
 
 const ProposalsPage = () => {
   const [statusFilter, setStatusFilter] = useState('');
@@ -121,16 +122,6 @@ const ProposalsPage = () => {
       default:
         return 'secondary';
     }
-  };
-
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   return (
@@ -377,7 +368,7 @@ const ProposalsPage = () => {
               <Col md={6}>
                 <Card className="shadow-sm border-0">
                   <Card.Header className="bg-white py-3 border-bottom">
-                    <h5 className="mb-0"><i className="fas fa-dollar-sign me-2 text-success"></i>Financial Summary</h5>
+                    <h5 className="mb-0"><i className="fas fa-rupee-sign me-2 text-success"></i>Financial Summary</h5>
                   </Card.Header>
                   <Card.Body>
                     <Row>
