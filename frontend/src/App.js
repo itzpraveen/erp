@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
 import Header from './components/Header';
@@ -19,16 +19,18 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import UsersPage from './pages/UsersPage';
 
-
 // Styles
+import 'bootstrap/dist/css/bootstrap.min.css';
+import '@fortawesome/fontawesome-free/css/all.min.css';
+import './assets/styles/tenaga-theme.css';
 import './App.css';
 
 const App = () => {
   return (
     <Router>
       <Header />
-      {/* WebSocket notifications are disabled to prevent connection errors */}
-      {/* <WebSocketNotifications /> */}
+      {/* WebSocket notifications are enabled for real-time updates */}
+      <WebSocketNotifications />
       <main className="py-3">
         <Container>
           <Routes>
@@ -43,6 +45,7 @@ const App = () => {
             <Route path="/proposals" element={<ProposalsPage />} />
             <Route path="/proposals/create" element={<ProposalDetailsPage mode="create" />} />
             <Route path="/proposals/:id" element={<ProposalDetailsPage />} />
+            <Route path="/proposals/:id/edit" element={<ProposalDetailsPage mode="edit" />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/create" element={<ProjectDetailsPage mode="create" />} />
             <Route path="/projects/:id" element={<ProjectDetailsPage />} />

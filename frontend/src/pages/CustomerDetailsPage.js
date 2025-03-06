@@ -62,89 +62,24 @@ const CustomerDetailsPage = ({ mode }) => {
     if (!isCreateMode && id) {
       setIsLoading(true);
       
-      // This would be replaced with an API call in a real implementation
-      // Simulating API call with mock data
-      setTimeout(() => {
-        // Dummy customer data map to match IDs
-        const customerDataMap = {
-          // Customer 1 - Rajan Sharma
-          '1': {
-            _id: '1',
-            name: 'Rajan Sharma',
-            email: 'rajan.sharma@example.com',
-            phone: '+91 9876543210',
-            address: '123 Willow St, Wayanad, Kerala',
-            type: 'residential',
-            status: 'active',
-            createdAt: '2023-01-15',
-            contactPerson: '',
-            alternatePhone: '+91 9876543220',
-            gstNumber: '',
-            notes: 'Residential customer interested in off-grid solar solutions.',
-            totalProjects: 1,
-            lifetimeValue: 120000
-          },
-          // Customer 2 - Green Valley Resort
-          '2': {
-            _id: '2',
-            name: 'Green Valley Resort',
-            email: 'management@greenvalley.com',
-            phone: '+91 9876543211',
-            address: 'Green Valley Road, Munnar, Kerala',
-            type: 'commercial',
-            status: 'active',
-            createdAt: '2023-02-05',
-            contactPerson: 'Arun Kumar',
-            alternatePhone: '+91 9876543299',
-            gstNumber: 'GSTIN12345678XY',
-            notes: 'Large resort with multiple buildings. Interested in comprehensive solar solution.',
-            totalProjects: 1,
-            lifetimeValue: 350000
-          },
-          // Customer 3 - Govt FHC
-          '3': {
-            _id: '3',
-            name: 'Govt. FHC Kakkodi',
-            email: 'fhc.kakkodi@gov.in',
-            phone: '+91 9876543212',
-            address: 'Govt. FHC, Kakkodi, Kozhikode',
-            type: 'government',
-            status: 'active',
-            createdAt: '2023-01-20',
-            contactPerson: 'Dr. Sanjay Menon',
-            alternatePhone: '+91 9876543213',
-            gstNumber: 'GOVTFHC123456',
-            notes: 'Government facility requiring uninterrupted power for critical medical equipment.',
-            totalProjects: 2,
-            lifetimeValue: 220000
-          },
-          // Default - use if ID isn't found
-          'default': {
-            _id: id,
-            name: 'Sample Customer',
-            email: 'sample@example.com',
-            phone: '+91 9876543214',
-            address: 'Sample Address',
-            type: 'residential',
-            status: 'active',
-            createdAt: '2023-01-01',
-            contactPerson: '',
-            alternatePhone: '',
-            gstNumber: '',
-            notes: 'Sample customer for testing.',
-            totalProjects: 0,
-            lifetimeValue: 0
-          }
-        };
-        
-        // Get the customer data based on ID, or use default if not found
-        const customerData = customerDataMap[id] || customerDataMap['default'];
-        
+      // Get customers from localStorage
+      const storedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+      
+      // Find the customer with the matching ID
+      // Make sure we're comparing strings to handle any type differences
+      const customerData = storedCustomers.find(customer => String(customer._id) === String(id));
+      
+      console.log('Current ID:', id);
+      console.log('Found customer data:', customerData);
+      console.log('All customers:', storedCustomers);
+      
+      if (customerData) {
         // Set customer data
         setCustomerData(customerData);
         
         // Set form data for edit mode
         if (isEditMode) {
+          console.log('Setting form data in edit mode');
           setFormData({
             name: customerData.name,
             email: customerData.email,
@@ -159,7 +94,8 @@ const CustomerDetailsPage = ({ mode }) => {
           });
         }
         
-        // Load customer history (mock data)
+        // In a real app, you would fetch this from the API
+        // For this demo, just use some sample data
         const history = {
           leads: [
             {
@@ -205,10 +141,22 @@ const CustomerDetailsPage = ({ mode }) => {
         };
         
         setCustomerHistory(history);
-        setIsLoading(false);
-      }, 1000);
+      } else {
+        // Customer not found, set empty data
+        setCustomerData(null);
+        
+        if (isEditMode) {
+          // Handle case where customer is not found but we're in edit mode
+          setSubmitError('Customer not found. Please go back to the customer list and try again.');
+          setTimeout(() => {
+            navigate('/customers');
+          }, 3000); // Redirect after 3 seconds
+        }
+      }
+      
+      setIsLoading(false);
     }
-  }, [isCreateMode, isEditMode, id]);
+  }, [isCreateMode, isEditMode, id, navigate]);
   
   // Handle form field changes
   const handleChange = (e) => {
@@ -276,15 +224,15 @@ const CustomerDetailsPage = ({ mode }) => {
       
       // Find the customer to update
       const updatedCustomers = existingCustomers.map(customer => {
-        if (customer._id === id) {
+        if (String(customer._id) === String(id)) {
           return { 
             ...customer, 
             ...customerData,
             // Keep these fields unchanged
             _id: customer._id,
             createdAt: customer.createdAt,
-            totalProjects: customer.totalProjects,
-            lifetimeValue: customer.lifetimeValue
+            totalProjects: customer.totalProjects || 0,
+            lifetimeValue: customer.lifetimeValue || 0
           };
         }
         return customer;

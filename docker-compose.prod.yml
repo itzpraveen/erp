@@ -7,10 +7,28 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+      # Add volume for automated backups
+      - ./mongo-backups:/backups
     restart: always
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_INITDB_DATABASE=solar-erp
+    # Add command to optimize cache size and prevent memory issues
+    command: ["--wiredTigerCacheSizeGB", "1", "--auth"]
+    networks:
+      - erp-network
+
+  # Redis for caching and session management
+  redis:
+    image: redis:alpine
+    container_name: erp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     networks:
       - erp-network
 
@@ -30,9 +48,26 @@ services:
       - MONGO_PASSWORD=${MONGO_PASSWORD}
       - MONGO_AUTH_SOURCE=admin
       - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URI=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     depends_on:
       - mongodb
+      - redis
     restart: always
+    networks:
+      - erp-network
+
+  # Scheduled backup service
+  backup:
+    image: mongo:latest
+    depends_on:
+      - mongodb
+    volumes:
+      - ./mongo-backups:/backups
+      - ./scripts:/scripts
+    entrypoint: "/bin/bash"
+    command: ["/scripts/backup.sh"]
+    restart: unless-stopped
     networks:
       - erp-network
 
@@ -74,4 +109,6 @@ networks:
 
 volumes:
   mongo-data:
+    driver: local
+  redis-data:
     driver: local

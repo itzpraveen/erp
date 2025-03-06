@@ -11,17 +11,27 @@ const ProjectsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [projects, setProjects] = useState([]);
+  const [customers, setCustomers] = useState([]);
 
   useEffect(() => {
-    // This would be replaced with an actual API call in a complete implementation
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setProjects([
+    
+    // Load customers from localStorage
+    const storedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+    setCustomers(storedCustomers);
+    
+    // Load projects from localStorage or use default data if none exists
+    const storedProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+    
+    if (storedProjects.length > 0) {
+      setProjects(storedProjects);
+    } else {
+      // Default sample projects if none in localStorage
+      const defaultProjects = [
         {
           _id: '1',
           name: '35KW On-Grid Plant',
-          customer: 'KM Rexine',
+          customer: '5', // KM Rexine
           location: 'Perinthalmanna',
           status: 'planning',
           contractNumber: 'PRJ2023-001',
@@ -29,12 +39,13 @@ const ProjectsPage = () => {
           targetCompletionDate: '2023-05-20',
           progress: 25,
           type: 'on-grid',
-          capacity: 35
+          capacity: 35,
+          createdAt: '2023-03-01',
         },
         {
           _id: '2',
           name: '10KW Hybrid System',
-          customer: 'Govt FHC',
+          customer: '3', // Govt FHC
           location: 'Kakkodi, Kozhikode',
           status: 'testing',
           contractNumber: 'PRJ2023-002',
@@ -42,12 +53,13 @@ const ProjectsPage = () => {
           targetCompletionDate: '2023-03-30',
           progress: 90,
           type: 'hybrid',
-          capacity: 10
+          capacity: 10,
+          createdAt: '2023-02-01',
         },
         {
           _id: '3',
           name: '20KW On-Grid Installation',
-          customer: 'Janatha Home World',
+          customer: '4', // Janatha Home World
           location: 'Perinthalmanna',
           status: 'installation',
           contractNumber: 'PRJ2023-003',
@@ -55,12 +67,13 @@ const ProjectsPage = () => {
           targetCompletionDate: '2023-04-15',
           progress: 65,
           type: 'on-grid',
-          capacity: 20
+          capacity: 20,
+          createdAt: '2023-02-15',
         },
         {
           _id: '4',
           name: '5KW Off-Grid System',
-          customer: 'Rajan Residence',
+          customer: '1', // Rajan Sharma
           location: 'Wayanad',
           status: 'completed',
           contractNumber: 'PRJ2023-004',
@@ -68,12 +81,13 @@ const ProjectsPage = () => {
           targetCompletionDate: '2023-02-15',
           progress: 100,
           type: 'off-grid',
-          capacity: 5
+          capacity: 5,
+          createdAt: '2023-01-01',
         },
         {
           _id: '5',
           name: '15KW Hybrid System',
-          customer: 'Green Valley Resort',
+          customer: '2', // Green Valley Resort
           location: 'Munnar',
           status: 'planning',
           contractNumber: 'PRJ2023-005',
@@ -81,11 +95,17 @@ const ProjectsPage = () => {
           targetCompletionDate: '2023-05-30',
           progress: 10,
           type: 'hybrid',
-          capacity: 15
+          capacity: 15,
+          createdAt: '2023-03-10',
         }
-      ]);
-      setIsLoading(false);
-    }, 1000);
+      ];
+      
+      // Save default projects to localStorage
+      localStorage.setItem('projects', JSON.stringify(defaultProjects));
+      setProjects(defaultProjects);
+    }
+    
+    setIsLoading(false);
   }, []);
 
   // Filter projects based on status and active tab
@@ -131,6 +151,12 @@ const ProjectsPage = () => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString();
+  };
+  
+  // Get customer name by ID
+  const getCustomerName = (customerId) => {
+    const customer = customers.find(c => String(c._id) === String(customerId));
+    return customer ? customer.name : 'Unknown';
   };
 
   return (
@@ -229,7 +255,7 @@ const ProjectsPage = () => {
                   <tr key={project._id}>
                     <td>{project.contractNumber}</td>
                     <td>{project.name}</td>
-                    <td>{project.customer}</td>
+                    <td>{getCustomerName(project.customer)}</td>
                     <td>{getTypeBadge(project.type)}</td>
                     <td>{project.capacity}KW</td>
                     <td>{getStatusBadge(project.status)}</td>

@@ -6,18 +6,21 @@ const {
   getProposalById,
   updateProposal,
   deleteProposal,
-  addProposalDocument,
   getProposalStats,
 } = require('../controllers/proposalController');
 const { protect, admin, checkRole } = require('../middleware/authMiddleware');
+const { cacheMiddleware } = require('../config/cache/redis');
 
-router.route('/').post(protect, createProposal).get(protect, getProposals);
-router.route('/stats').get(protect, getProposalStats);
+// Cache proposal list for 5 minutes
+router.route('/').post(protect, createProposal).get(protect, cacheMiddleware(300), getProposals);
+
+// Cache proposal stats for 30 minutes
+router.route('/stats').get(protect, cacheMiddleware(1800), getProposalStats);
+
 router
   .route('/:id')
   .get(protect, getProposalById)
   .put(protect, updateProposal)
   .delete(protect, checkRole(['admin', 'manager']), deleteProposal);
-router.route('/:id/documents').post(protect, addProposalDocument);
 
 module.exports = router;

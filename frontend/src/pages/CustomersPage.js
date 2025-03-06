@@ -368,7 +368,10 @@ const CustomersPage = () => {
                           <Button
                             variant="primary"
                             size="sm"
-                            onClick={() => navigate(`/customers/${customer._id}/edit`)}
+                            onClick={() => {
+                              console.log('Navigating to edit customer with ID:', customer._id);
+                              navigate(`/customers/${customer._id}/edit`);
+                            }}
                           >
                             <i className="fas fa-edit me-1"></i> Edit
                           </Button>

@@ -17,6 +17,7 @@ const ProjectDetailsPage = ({ mode }) => {
   const [validated, setValidated] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [customers, setCustomers] = useState([]);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -39,6 +40,14 @@ const ProjectDetailsPage = ({ mode }) => {
       navigate('/login');
     }
   }, [navigate, userInfo]);
+  
+  // Load customers
+  useEffect(() => {
+    // Get customers from localStorage
+    const storedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+    console.log('Loaded customers:', storedCustomers);
+    setCustomers(storedCustomers);
+  }, []);
   
   // Load project data if in edit mode
   useEffect(() => {
@@ -112,17 +121,63 @@ const ProjectDetailsPage = ({ mode }) => {
       projectData.budget = parseFloat(projectData.budget);
     }
     
-    // In a real implementation, this would dispatch an action to save the project
+    // Save the project to localStorage
+    if (isCreateMode) {
+      // Generate a unique ID for the new project
+      const projectId = `project-${Date.now()}`;
+      projectData._id = projectId;
+      projectData.progress = 0; // Initial progress
+      projectData.createdAt = new Date().toISOString();
+      
+      // Get existing projects from localStorage or initialize empty array
+      const existingProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+      
+      // Add new project to the list
+      existingProjects.push(projectData);
+      
+      // Save back to localStorage
+      localStorage.setItem('projects', JSON.stringify(existingProjects));
+      
+      // Update the customer with the new project count
+      if (projectData.customer) {
+        const storedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+        const updatedCustomers = storedCustomers.map(customer => {
+          if (String(customer._id) === String(projectData.customer)) {
+            const totalProjects = (customer.totalProjects || 0) + 1;
+            return { ...customer, totalProjects };
+          }
+          return customer;
+        });
+        localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+      }
+    } else if (isEditMode && id) {
+      // Get existing projects
+      const existingProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+      
+      // Find the project to update
+      const updatedProjects = existingProjects.map(project => {
+        if (String(project._id) === String(id)) {
+          return { 
+            ...project, 
+            ...projectData,
+            _id: project._id,  // Keep original ID
+            createdAt: project.createdAt // Keep creation date
+          };
+        }
+        return project;
+      });
+      
+      // Save back to localStorage
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+    }
+    
     console.log('Submitting project data:', projectData);
     
-    // Simulate API call
+    // Show success message and redirect
+    setSubmitSuccess(true);
     setTimeout(() => {
-      setSubmitSuccess(true);
-      // Redirect after a short delay to show success message
-      setTimeout(() => {
-        navigate('/projects');
-      }, 1000);
-    }, 500);
+      navigate('/projects');
+    }, 1000);
   };
   
   return (
@@ -185,12 +240,15 @@ const ProjectDetailsPage = ({ mode }) => {
                     required
                   >
                     <option value="">Select Customer</option>
-                    {/* Customer options would be populated from API */}
-                    <option value="customer1">Rajan Sharma</option>
-                    <option value="customer2">Green Valley Resort</option>
-                    <option value="customer3">Govt FHC</option>
-                    <option value="customer4">Janatha Home World</option>
-                    <option value="customer5">KM Rexine</option>
+                    {customers.length > 0 ? (
+                      customers.map((customer) => (
+                        <option key={customer._id} value={customer._id}>
+                          {customer.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>No customers found</option>
+                    )}
                   </Form.Select>
                   <Form.Control.Feedback type="invalid">
                     Please select a customer.

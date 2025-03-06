@@ -4,138 +4,188 @@ import api from '../../utils/api';
 const initialState = {
   proposals: [],
   proposal: null,
+  proposalStats: null,
+  metrics: null,
   page: 1,
   pages: 1,
+  total: 0,
   isLoading: false,
-  isSuccess: false,
   isError: false,
+  isSuccess: false,
   message: '',
 };
 
 // Get all proposals
 export const getProposals = createAsyncThunk(
-  'proposals/getAll',
-  async (params = {}, { rejectWithValue }) => {
+  'proposals/getProposals',
+  async (params = {}, thunkAPI) => {
     try {
-      // Build query string from params
-      const queryParams = new URLSearchParams();
-      if (params.page) queryParams.append('page', params.page);
-      if (params.status) queryParams.append('status', params.status);
-      if (params.lead) queryParams.append('lead', params.lead);
-      
-      // Add timestamp for cache busting
-      queryParams.append('_', new Date().getTime());
-      
-      const response = await api.get(`/api/proposals?${queryParams.toString()}`);
-      return response.data;
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+        params,
+      };
+
+      const { data } = await api.get('/api/proposals', config);
+      return data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch proposals'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
 // Get proposal by ID
 export const getProposalById = createAsyncThunk(
-  'proposals/getById',
-  async (id, { rejectWithValue }) => {
+  'proposals/getProposalById',
+  async (id, thunkAPI) => {
     try {
-      const response = await api.get(`/api/proposals/${id}`);
-      return response.data;
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.get(`/api/proposals/${id}`, config);
+      return data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch proposal'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
 // Create proposal
 export const createProposal = createAsyncThunk(
-  'proposals/create',
-  async (proposalData, { rejectWithValue }) => {
+  'proposals/createProposal',
+  async (proposalData, thunkAPI) => {
     try {
-      const response = await api.post('/api/proposals', proposalData);
-      return response.data;
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post('/api/proposals', proposalData, config);
+      return data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to create proposal'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
 // Update proposal
 export const updateProposal = createAsyncThunk(
-  'proposals/update',
-  async ({ id, proposalData }, { rejectWithValue }) => {
+  'proposals/updateProposal',
+  async ({ id, proposalData }, thunkAPI) => {
     try {
-      const response = await api.put(`/api/proposals/${id}`, proposalData);
-      return response.data;
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.put(`/api/proposals/${id}`, proposalData, config);
+      return data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to update proposal'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
-// Delete proposal (soft delete)
+// Delete proposal
 export const deleteProposal = createAsyncThunk(
-  'proposals/delete',
-  async (id, { rejectWithValue }) => {
+  'proposals/deleteProposal',
+  async (id, thunkAPI) => {
     try {
-      await api.delete(`/api/proposals/${id}`);
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      await api.delete(`/api/proposals/${id}`, config);
       return id;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to delete proposal'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
-// Add document to proposal
-export const addProposalDocument = createAsyncThunk(
-  'proposals/addDocument',
-  async ({ id, documentData }, { rejectWithValue }) => {
+// Get proposal stats
+export const getProposalStats = createAsyncThunk(
+  'proposals/getProposalStats',
+  async (_, thunkAPI) => {
     try {
-      const response = await api.post(`/api/proposals/${id}/documents`, documentData);
-      return response.data;
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.get('/api/proposals/stats', config);
+      return data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to add document'
-      );
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
     }
   }
 );
 
-const proposalSlice = createSlice({
+export const proposalSlice = createSlice({
   name: 'proposals',
   initialState,
   reducers: {
-    resetProposals: (state) => {
-      state.proposals = [];
+    reset: (state) => {
       state.isLoading = false;
-      state.isSuccess = false;
       state.isError = false;
+      state.isSuccess = false;
       state.message = '';
     },
     resetProposal: (state) => {
       state.proposal = null;
-      state.isLoading = false;
-      state.isSuccess = false;
-      state.isError = false;
-      state.message = '';
     },
   },
   extraReducers: (builder) => {
     builder
-      // Get all proposals
       .addCase(getProposals.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
       .addCase(getProposals.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -143,17 +193,16 @@ const proposalSlice = createSlice({
         state.proposals = action.payload.proposals;
         state.page = action.payload.page;
         state.pages = action.payload.pages;
+        state.total = action.payload.total;
+        state.metrics = action.payload.metrics;
       })
       .addCase(getProposals.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Get proposal by ID
       .addCase(getProposalById.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
       .addCase(getProposalById.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -165,47 +214,43 @@ const proposalSlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Create proposal
       .addCase(createProposal.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
       .addCase(createProposal.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        state.proposal = action.payload;
+        state.proposals.unshift(action.payload);
       })
       .addCase(createProposal.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Update proposal
       .addCase(updateProposal.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
       .addCase(updateProposal.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
         state.proposal = action.payload;
+        // Update proposal in proposals array
+        state.proposals = state.proposals.map((proposal) =>
+          proposal._id === action.payload._id ? action.payload : proposal
+        );
       })
       .addCase(updateProposal.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Delete proposal
       .addCase(deleteProposal.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
       .addCase(deleteProposal.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
+        // Remove proposal from state
         state.proposals = state.proposals.filter(
           (proposal) => proposal._id !== action.payload
         );
@@ -215,18 +260,15 @@ const proposalSlice = createSlice({
         state.isError = true;
         state.message = action.payload;
       })
-      
-      // Add document to proposal
-      .addCase(addProposalDocument.pending, (state) => {
+      .addCase(getProposalStats.pending, (state) => {
         state.isLoading = true;
-        state.isError = false;
       })
-      .addCase(addProposalDocument.fulfilled, (state, action) => {
+      .addCase(getProposalStats.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        state.proposal = action.payload;
+        state.proposalStats = action.payload;
       })
-      .addCase(addProposalDocument.rejected, (state, action) => {
+      .addCase(getProposalStats.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
@@ -234,5 +276,5 @@ const proposalSlice = createSlice({
   },
 });
 
-export const { resetProposals, resetProposal } = proposalSlice.actions;
+export const { reset, resetProposal } = proposalSlice.actions;
 export default proposalSlice.reducer;

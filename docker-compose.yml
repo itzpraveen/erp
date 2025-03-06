@@ -10,6 +10,20 @@ services:
     restart: always
     networks:
       - erp-network
+    # Add command to optimize cache size and prevent memory issues
+    command: ["--wiredTigerCacheSizeGB", "1"]
+
+  # Redis for caching and session management
+  redis:
+    image: redis:alpine
+    container_name: erp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+    networks:
+      - erp-network
 
   # Backend API Service
   backend:
@@ -24,8 +38,10 @@ services:
       - PORT=5001
       - MONGO_URI=mongodb://mongodb:27017/solar-erp
       - JWT_SECRET=erp-secret-key-development
+      - REDIS_URI=redis://redis:6379
     depends_on:
       - mongodb
+      - redis
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -58,4 +74,6 @@ networks:
 
 volumes:
   mongo-data:
+    driver: local
+  redis-data:
     driver: local
