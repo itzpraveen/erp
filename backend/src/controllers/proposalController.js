@@ -1,6 +1,5 @@
 const Proposal = require('../models/Proposal');
 const Lead = require('../models/Lead');
-const { cacheUtils } = require('../config/cache/redis');
 
 // @desc    Create a new proposal
 // @route   POST /api/proposals
@@ -51,9 +50,6 @@ const createProposal = async (req, res) => {
     });
 
     if (proposal) {
-      // Clear cache for proposals
-      await cacheUtils.clearPattern('__express__/api/proposals*');
-      
       // Return the created proposal
       const populatedProposal = await Proposal.findById(proposal._id)
         .populate('lead', 'name email phone')
@@ -313,10 +309,6 @@ const updateProposal = async (req, res) => {
 
       const updatedProposal = await proposal.save();
       
-      // Clear cache
-      await cacheUtils.clearPattern('__express__/api/proposals*');
-      await cacheUtils.clearPattern(`__express__/api/proposals/${updatedProposal._id}`);
-      
       // Return updated proposal
       const populatedProposal = await Proposal.findById(updatedProposal._id)
         .populate('lead', 'name email phone')
@@ -361,9 +353,6 @@ const deleteProposal = async (req, res) => {
       });
 
       await proposal.save();
-      
-      // Clear cache
-      await cacheUtils.clearPattern('__express__/api/proposals*');
       
       res.json({ message: 'Proposal marked as rejected' });
     } else {

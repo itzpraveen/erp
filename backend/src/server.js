@@ -4,8 +4,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const http = require('http');
 const WebSocket = require('ws');
-const session = require('express-session');
-const { initRedis, cacheMiddleware } = require('./config/cache/redis');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const userRoutes = require('./routes/userRoutes');
@@ -20,12 +18,6 @@ dotenv.config();
 
 // Connect to database
 connectDB();
-
-// Initialize Redis
-let redisClient;
-(async () => {
-  redisClient = await initRedis();
-})();
 
 const app = express();
 
@@ -60,25 +52,6 @@ app.use(helmet.contentSecurityPolicy({
   },
 }));
 
-// Setup Session with Redis Store if Redis is available
-if (redisClient && redisClient.isReady) {
-  const RedisStore = require('connect-redis').default;
-  
-  app.use(session({
-    store: new RedisStore({ client: redisClient }),
-    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
-    }
-  }));
-  
-  console.log('Redis session store initialized');
-}
-
 // Middleware
 app.use(express.json());
 
@@ -87,8 +60,7 @@ app.get('/api/status', (req, res) => {
   res.json({ 
     status: 'API is running properly',
     time: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-    redisConnected: redisClient && redisClient.isReady ? true : false
+    env: process.env.NODE_ENV
   });
 });
 
@@ -98,8 +70,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    memory: process.memoryUsage(),
-    redisConnected: redisClient && redisClient.isReady ? true : false
+    memory: process.memoryUsage()
   });
 });
 
@@ -192,30 +163,3 @@ process.on('uncaughtException', (err) => {
   // Close server & exit process
   server.close(() => process.exit(1));
 });
-
-// Graceful shutdown
-const shutdown = async () => {
-  console.log('Shutting down server...');
-  
-  // Close Redis connection if available
-  if (redisClient && redisClient.isReady) {
-    await redisClient.quit();
-    console.log('Redis connection closed');
-  }
-  
-  // Close server
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-  
-  // Force close if server doesn't close in 10 seconds
-  setTimeout(() => {
-    console.error('Server shutdown timed out, forcing exit');
-    process.exit(1);
-  }, 10000);
-};
-
-// Handle termination signals
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);

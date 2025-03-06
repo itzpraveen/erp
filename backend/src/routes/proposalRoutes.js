@@ -9,13 +9,10 @@ const {
   getProposalStats,
 } = require('../controllers/proposalController');
 const { protect, admin, checkRole } = require('../middleware/authMiddleware');
-const { cacheMiddleware } = require('../config/cache/redis');
 
-// Cache proposal list for 5 minutes
-router.route('/').post(protect, createProposal).get(protect, cacheMiddleware(300), getProposals);
-
-// Cache proposal stats for 30 minutes
-router.route('/stats').get(protect, cacheMiddleware(1800), getProposalStats);
+// Remove caching middleware for now
+router.route('/').post(protect, createProposal).get(protect, getProposals);
+router.route('/stats').get(protect, getProposalStats);
 
 router
   .route('/:id')
