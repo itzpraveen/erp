@@ -27,6 +27,59 @@ const CACHED_ROUTES = {
   '/api/enhanced-solar-calculator/options': CACHE_DURATIONS.VERY_LONG,
 };
 
+// Middleware to cache a specific route
+const cacheRoute = (prefix, expireSeconds = 300) => {
+  return (req, res, next) => {
+    // Skip if Redis is not enabled or not in production
+    if (!redisCache.isEnabled() || config.nodeEnv !== 'production') {
+      return next();
+    }
+    
+    // Skip for non-GET requests
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return next();
+    }
+    
+    // Create cache key from prefix and request path + body for POST or query for GET
+    let cacheKey = `${prefix}:${req.originalUrl || req.url}`;
+    if (req.method === 'POST' && req.body) {
+      // For POST requests, include a hash of the body in the cache key
+      const bodyStr = JSON.stringify(req.body);
+      cacheKey += `:${Buffer.from(bodyStr).toString('base64').substring(0, 20)}`;
+    }
+    
+    // Try to get from cache
+    redisCache.getCache(cacheKey)
+      .then(cachedData => {
+        if (cachedData) {
+          logger.debug(`Cache hit for ${cacheKey}`);
+          return res.json(cachedData);
+        }
+        
+        // Cache miss, intercept response to cache
+        const originalJson = res.json;
+        
+        res.json = function(data) {
+          // Only cache successful responses
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            // Cache response data
+            redisCache.setCache(cacheKey, data, expireSeconds)
+              .catch(err => logger.error(`Error caching response for ${cacheKey}:`, err));
+          }
+          
+          // Call original json method
+          return originalJson.call(this, data);
+        };
+        
+        next();
+      })
+      .catch(error => {
+        logger.error(`Cache middleware error for ${cacheKey}:`, error);
+        next();
+      });
+  };
+};
+
 // Middleware to apply caching based on route
 const routeCacheMiddleware = (req, res, next) => {
   // Skip if not enabled or not in production
@@ -117,5 +170,6 @@ const clearCacheMiddleware = (patterns) => {
 module.exports = {
   routeCacheMiddleware,
   clearCacheMiddleware,
+  cacheRoute,
   CACHE_DURATIONS
 };

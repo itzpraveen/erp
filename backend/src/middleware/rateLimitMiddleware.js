@@ -78,7 +78,8 @@ const apiLimiter = rateLimit({
     code: 'RATE_LIMIT_EXCEEDED'
   },
   handler: (req, res, next, options) => {
-    logger.warn(`Rate limit exceeded: ${req.ip}`, {
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    logger.warn(`Rate limit exceeded: ${ipAddress}`, {
       path: req.originalUrl,
       method: req.method,
       userAgent: req.headers['user-agent'] || 'unknown'
@@ -86,14 +87,7 @@ const apiLimiter = rateLimit({
     res.status(options.statusCode).json(options.message);
   },
   skip: (req, res) => req.originalUrl.includes('/health'), // Don't rate limit health checks
-  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for'] || 'unknown',
-  onLimitReached: (req, res, options) => {
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    logger.error(`Rate limit reached for IP: ${ipAddress}`, {
-      path: req.originalUrl,
-      method: req.method
-    });
-  }
+  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for'] || 'unknown'
 });
 
 // Stricter rate limiter for auth endpoints
