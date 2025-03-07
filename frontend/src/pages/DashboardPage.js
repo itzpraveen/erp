@@ -20,6 +20,7 @@ const DashboardPage = () => {
   
   // Memoize status counts for better rendering performance
   const statusCounts = useMemo(() => leadStats?.statusCounts || [], [leadStats]);
+  // We'll use sourceCounts in the Lead Sources section
   const sourceCounts = useMemo(() => leadStats?.sourceCounts || [], [leadStats]);
   
   // Calculate total leads once instead of multiple times
@@ -216,7 +217,7 @@ const DashboardPage = () => {
             </Col>
           </Row>
 
-          {leadStats && leadStats.statusCounts && leadStats.statusCounts.length > 0 && (
+          {statusCounts.length > 0 && (
             <Row className="mt-4">
               <h3 className="mb-3">Analytics</h3>
               <Col md={6}>
@@ -225,8 +226,8 @@ const DashboardPage = () => {
                     <h5 className="mb-0"><i className="fas fa-chart-pie me-2 text-primary"></i>Lead Status</h5>
                   </Card.Header>
                   <Card.Body>
-                    {leadStats.statusCounts.map((stat, index) => {
-                      const total = leadStats.statusCounts.reduce((sum, s) => sum + s.count, 0);
+                    {statusCounts.map((stat, index) => {
+                      const total = statusCounts.reduce((sum, s) => sum + s.count, 0);
                       const percentage = total > 0 ? Math.round((stat.count / total) * 100) : 0;
                       let badgeColor = 'primary';
                       
@@ -265,15 +266,15 @@ const DashboardPage = () => {
                   </Card.Body>
                 </Card>
               </Col>
-              {leadStats.sourceCounts && leadStats.sourceCounts.length > 0 && (
+              {sourceCounts.length > 0 && (
               <Col md={6}>
                 <Card className="shadow-sm border-0">
                   <Card.Header className="bg-white border-bottom py-3">
                     <h5 className="mb-0"><i className="fas fa-bullhorn me-2 text-success"></i>Lead Sources</h5>
                   </Card.Header>
                   <Card.Body>
-                    {leadStats.sourceCounts.map((stat, index) => {
-                      const total = leadStats.sourceCounts.reduce((sum, s) => sum + s.count, 0);
+                    {sourceCounts.map((stat, index) => {
+                      const total = sourceCounts.reduce((sum, s) => sum + s.count, 0);
                       const percentage = total > 0 ? Math.round((stat.count / total) * 100) : 0;
                       const colors = ['success', 'info', 'warning', 'danger', 'primary', 'secondary'];
                       const colorIndex = index % colors.length;
