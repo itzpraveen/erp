@@ -34,11 +34,7 @@ logger.info(`Initializing server in ${config.nodeEnv} mode...`);
 // Create Express application
 const app = express();
 
-// =====================================
-// CRITICAL: HEALTH CHECK ENDPOINT
-// Must be registered before any middleware
-// This is used by Railway for deployment health checks
-// =====================================
+// Health check endpoint - must be registered early
 app.get('/health', (req, res) => {
   // Simple response with no dependencies
   console.log('Health check endpoint accessed at', new Date().toISOString());
@@ -48,8 +44,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Register the same health check at the root path for redundancy
-app.get('/', (req, res) => {
+// API status endpoint
+app.get('/api', (req, res) => {
   res.status(200).json({
     status: 'ok',
     message: 'ERP API is running',
