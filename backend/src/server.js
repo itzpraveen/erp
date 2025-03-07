@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const WebSocket = require('ws');
@@ -9,12 +10,15 @@ const mongoose = require('mongoose');
 const config = require('./config/config');
 const connectDB = require('./config/db');
 const seedDatabase = require('./seed');
+const createIndexes = require('./utils/createIndexes');
 const logger = require('./utils/logger');
 const httpLogger = require('./middleware/httpLoggerMiddleware');
 const corsMiddleware = require('./middleware/corsMiddleware');
 const dbStatusMiddleware = require('./middleware/dbStatusMiddleware');
 const requestTraceMiddleware = require('./middleware/requestTraceMiddleware');
 const securityHeadersMiddleware = require('./middleware/securityHeadersMiddleware');
+const { routeCacheMiddleware, clearCacheMiddleware } = require('./middleware/cacheMiddleware');
+const redisCache = require('./utils/cache/redisCache');
 const { ApiError, notFound, errorHandler } = require('./middleware/errorMiddleware');
 const { apiLimiter, authLimiter, adminLimiter, rateLimitMiddleware } = require('./middleware/rateLimitMiddleware');
 const userRoutes = require('./routes/userRoutes');
@@ -94,6 +98,20 @@ if (config.nodeEnv === 'production') {
   }));
 }
 
+// Add compression middleware for better performance
+app.use(compression({
+  level: 6, // Balanced between CPU usage and compression ratio
+  threshold: 1024, // Only compress responses larger than 1KB
+  filter: (req, res) => {
+    // Don't compress responses with this header
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Use compression filter function from the module
+    return compression.filter(req, res);
+  }
+}));
+
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -114,6 +132,9 @@ try {
 
 // Add rate limit tracking middleware
 app.use(rateLimitMiddleware);
+
+// Add cache middleware for improved performance
+app.use(routeCacheMiddleware);
 
 // Apply rate limiting in production
 if (config.nodeEnv === 'production') {
@@ -167,13 +188,14 @@ if (config.nodeEnv !== 'production') {
   app.use('/api/test', testRoutes);
 }
 
-// Main API routes
+// Main API routes with cache clearing middleware where appropriate
 app.use('/api/users', userRoutes);
-app.use('/api/leads', leadRoutes);
-app.use('/api/proposals', proposalRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/service-requests', serviceRequestRoutes);
-app.use('/api/customers', customerRoutes);
+
+app.use('/api/leads', clearCacheMiddleware(['api:*stats*', 'api:*/leads*']), leadRoutes);
+app.use('/api/proposals', clearCacheMiddleware(['api:*stats*', 'api:*/proposals*']), proposalRoutes);
+app.use('/api/projects', clearCacheMiddleware(['api:*stats*', 'api:*/projects*']), projectRoutes);
+app.use('/api/service-requests', clearCacheMiddleware(['api:*stats*', 'api:*/service-requests*']), serviceRequestRoutes);
+app.use('/api/customers', clearCacheMiddleware(['api:*stats*', 'api:*/customers*']), customerRoutes);
 app.use('/api/solar-calculator', solarCalculatorRoutes);
 app.use('/api/enhanced-solar-calculator', enhancedSolarCalculatorRoutes);
 
@@ -182,11 +204,13 @@ if (config.nodeEnv === 'production') {
   // Set static folder
   const frontendBuildPath = path.resolve(__dirname, '../../frontend/build');
   
-  // Add cache control for static assets
+  // Add improved cache control for static assets
   app.use(express.static(frontendBuildPath, {
-    maxAge: '1d', // Cache for 1 day
+    maxAge: '7d', // Cache for 7 days
     etag: true,    // Use ETags
-    lastModified: true // Last-Modified header
+    lastModified: true, // Last-Modified header
+    immutable: true, // Add immutable for build files with hash names
+    index: false  // Don't serve index.html for directory requests
   }));
 
   // Serve index.html for any routes not defined above (React Router)
@@ -285,7 +309,7 @@ wss.on('connection', (ws, req) => {
 // Flag to track if server is ready
 let serverReady = false;
 
-// Connect to database, seed initial data if needed, and start server
+// Connect to database, setup Redis cache, seed initial data if needed, and start server
 (async () => {
   let dbConnected = false;
   
@@ -307,10 +331,28 @@ let serverReady = false;
         seedDatabase()
           .then(() => logger.info('Database seeding completed successfully'))
           .catch(seedError => logger.error('Error seeding database:', seedError));
+          
+        // Create database indexes for better performance (async, don't await)
+        createIndexes()
+          .then(result => {
+            if (result) {
+              logger.info('Database indexes created successfully');
+            } else {
+              logger.warn('Database indexes creation failed or partially completed');
+            }
+          })
+          .catch(indexError => logger.error('Error creating database indexes:', indexError));
       })
       .catch(err => {
         logger.error('Database connection failed or timed out', err);
       });
+    
+    // Initialize Redis cache in the background
+    try {
+      await redisCache.initRedisClient();
+    } catch (cacheError) {
+      logger.warn('Redis cache initialization failed, running without caching:', cacheError.message);
+    }
   } catch (err) {
     logger.error('Failed to connect to database during startup', err);
   }

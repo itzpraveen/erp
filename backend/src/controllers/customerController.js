@@ -82,12 +82,29 @@ const getCustomers = async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  const customers = await Customer.find(filter)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+  // Only select fields we need to display in the list view
+  const projection = {
+    name: 1,
+    email: 1,
+    phone: 1,
+    type: 1,
+    status: 1,
+    lifetimeValue: 1,
+    totalProjects: 1,
+    createdAt: 1
+  };
 
-  const totalCustomers = await Customer.countDocuments(filter);
+  // Run queries in parallel with Promise.all for better performance
+  const [customers, totalCustomers] = await Promise.all([
+    Customer.find(filter)
+      .select(projection)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(), // Convert to plain JS object for faster serialization
+      
+    Customer.countDocuments(filter)
+  ]);
 
   console.log(`Found ${customers.length} customers, total: ${totalCustomers}`);
 
@@ -159,23 +176,34 @@ const getCustomerHistory = async (req, res) => {
   const customerId = req.params.id;
 
   try {
-    // Get customer leads
-    const leads = await Lead.find({ customer: customerId })
-      .populate('assignedTo', 'name email')
-      .sort({ createdAt: -1 });
+    // Execute all queries in parallel for better performance
+    const [leads, proposals, projects, serviceRequests] = await Promise.all([
+      // Get customer leads with selective field projection
+      Lead.find({ customer: customerId })
+        .select('name email phone status source assignedTo createdAt updatedAt')
+        .populate('assignedTo', 'name email')
+        .sort({ createdAt: -1 })
+        .lean(),
 
-    // Get customer proposals
-    const proposals = await Proposal.find({ customer: customerId })
-      .sort({ createdAt: -1 });
+      // Get customer proposals with selective field projection
+      Proposal.find({ customer: customerId })
+        .select('name amount status createdAt updatedAt proposalDate expiryDate')
+        .sort({ createdAt: -1 })
+        .lean(),
 
-    // Get customer projects
-    const projects = await Project.find({ customer: customerId })
-      .sort({ createdAt: -1 });
+      // Get customer projects with selective field projection
+      Project.find({ customer: customerId })
+        .select('name status startDate endDate budget actualCost progress')
+        .sort({ createdAt: -1 })
+        .lean(),
 
-    // Get customer service requests
-    const serviceRequests = await ServiceRequest.find({ customer: customerId })
-      .populate('project', 'name contractNumber')
-      .sort({ createdAt: -1 });
+      // Get customer service requests with selective field projection
+      ServiceRequest.find({ customer: customerId })
+        .select('title description status priority project createdAt scheduledDate completedDate')
+        .populate('project', 'name contractNumber')
+        .sort({ createdAt: -1 })
+        .lean()
+    ]);
 
     res.json({
       leads,
@@ -194,43 +222,54 @@ const getCustomerHistory = async (req, res) => {
 // @access  Private
 const getCustomerStats = async (req, res) => {
   try {
-    // Get counts by type
-    const typeCounts = await Customer.aggregate([
-      { $group: { _id: '$type', count: { $sum: 1 } } },
-    ]);
-
-    // Get counts by status
-    const statusCounts = await Customer.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]);
-
-    // Get total lifetime value
-    const totalValue = await Customer.aggregate([
-      { $group: { _id: null, total: { $sum: '$lifetimeValue' } } },
-    ]);
-
-    // Get new customers per month (last 6 months)
+    // Run multiple aggregation pipelines in parallel for better performance
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const [
+      typeCounts,
+      statusCounts,
+      totalValue,
+      customersByMonth,
+      topCustomers
+    ] = await Promise.all([
+      // Get counts by type
+      Customer.aggregate([
+        { $group: { _id: '$type', count: { $sum: 1 } } },
+      ]),
 
-    const customersByMonth = await Customer.aggregate([
-      { $match: { createdAt: { $gte: sixMonthsAgo } } },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
+      // Get counts by status
+      Customer.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+
+      // Get total lifetime value
+      Customer.aggregate([
+        { $group: { _id: null, total: { $sum: '$lifetimeValue' } } },
+      ]),
+
+      // Get new customers per month (last 6 months)
+      Customer.aggregate([
+        { $match: { createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+            },
+            count: { $sum: 1 },
           },
-          count: { $sum: 1 },
         },
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } },
-    ]);
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]),
 
-    // Get top customers by value
-    const topCustomers = await Customer.find()
-      .sort({ lifetimeValue: -1 })
-      .limit(5);
+      // Get top customers by value - only select necessary fields
+      Customer.find()
+        .select('name email type lifetimeValue totalProjects')
+        .sort({ lifetimeValue: -1 })
+        .limit(5)
+        .lean()
+    ]);
 
     res.json({
       typeCounts,

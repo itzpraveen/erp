@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Row, Col, Card, Badge } from 'react-bootstrap';
 import { getLeadStats } from '../features/leads/leadSlice';
+import { selectCurrentUser, selectIsAuthenticated, selectIsCheckingAuth, selectLeadStats } from '../features/selectors';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
 
@@ -10,13 +11,24 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { userInfo, isAuthenticated, isCheckingAuth } = useSelector((state) => state.auth);
-  const { leadStats, isLoading, isError, message } = useSelector(
-    (state) => state.leads
-  );
+  // Use memoized selectors for better performance
+  const userInfo = useSelector(selectCurrentUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const isCheckingAuth = useSelector(selectIsCheckingAuth);
+  const leadStats = useSelector(selectLeadStats);
+  const { isLoading, isError, message } = useSelector(state => state.leads);
+  
+  // Memoize status counts for better rendering performance
+  const statusCounts = useMemo(() => leadStats?.statusCounts || [], [leadStats]);
+  const sourceCounts = useMemo(() => leadStats?.sourceCounts || [], [leadStats]);
+  
+  // Calculate total leads once instead of multiple times
+  const totalLeads = useMemo(() => {
+    return statusCounts.reduce((acc, stat) => acc + stat.count, 0) || 0;
+  }, [statusCounts]);
 
-  useEffect(() => {
-    // Wait until auth check is complete
+  // Memoize the navigation callback
+  const checkAuth = useCallback(() => {
     if (!isCheckingAuth) {
       // Redirect to login if not authenticated
       if (!userInfo || !isAuthenticated) {
@@ -26,6 +38,11 @@ const DashboardPage = () => {
       }
     }
   }, [navigate, userInfo, isAuthenticated, isCheckingAuth, dispatch]);
+  
+  // Use the memoized callback in useEffect
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   // Show loading state while checking authentication or not authenticated yet
   if (isCheckingAuth || !userInfo) {
@@ -70,10 +87,7 @@ const DashboardPage = () => {
                     <Card.Title as="h4" className="mb-0">Leads</Card.Title>
                   </div>
                   <Card.Text className="mb-3">
-                    {(leadStats?.statusCounts?.length > 0 ? leadStats.statusCounts.reduce(
-                      (acc, stat) => acc + stat.count,
-                      0
-                    ) : 0) || 0}{' '}
+                    {totalLeads}{' '}
                     total leads to manage
                   </Card.Text>
                   <Link to="/leads" className="btn btn-primary">

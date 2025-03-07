@@ -1,6 +1,6 @@
-# Project Summary: erp
+# Project Summary: Solar Panel ERP System
 
-Generated on: Fri Mar  7 16:24:19 IST 2025
+Updated on: Fri Mar 7 2025
 
 ## Project Structure
 ```
@@ -47,6 +47,7 @@ Generated on: Fri Mar  7 16:24:19 IST 2025
 ./backend/src/routes/testRoutes.js
 ./backend/src/routes/userRoutes.js
 ```
+
 ### Models
 ```
 ./backend/src/models/Customer.js
@@ -57,6 +58,44 @@ Generated on: Fri Mar  7 16:24:19 IST 2025
 ./backend/src/models/SolarServiceOffering.js
 ./backend/src/models/User.js
 ```
+
+## Performance Optimizations
+### Backend Optimizations
+1. **MongoDB Query Optimization**
+   - Field projection to reduce data transfer
+   - Parallel queries using Promise.all()
+   - Lean queries for faster serialization
+
+2. **Redis Caching**
+   - Dashboard statistics caching
+   - Intelligent cache invalidation
+   - Cache middleware for high-traffic endpoints
+
+3. **Response Compression**
+   - Added compression middleware
+   - Optimized for JSON responses
+   - Threshold-based compression
+
+4. **MongoDB Indexes**
+   - Automatic index creation for all collections
+   - Optimized indexes for common query patterns
+   - Background index creation
+
+### Frontend Optimizations
+1. **Redux Selectors**
+   - Memoized selectors for better performance
+   - Prevented unnecessary re-renders
+   - Optimized computed values
+
+2. **React Component Optimizations**
+   - UseMemo for expensive calculations
+   - UseCallback for event handlers
+   - Optimized rendering of list components
+
+3. **Production Build Optimizations**
+   - Disabled source maps
+   - Inline runtime chunks
+   - Optimized caching headers
 
 ## Frontend
 ### Pages
@@ -85,6 +124,7 @@ Generated on: Fri Mar  7 16:24:19 IST 2025
 ./frontend/src/pages/UserManagementPage.js
 ./frontend/src/pages/UsersPage.js
 ```
+
 ### Components
 ```
 ./frontend/src/components/SolarCalculator
@@ -141,6 +181,7 @@ services:
   # MongoDB Service
   mongodb:
 ```
+
 ### Railway Configuration
 ```json
 {
@@ -160,8 +201,9 @@ services:
 }
 ```
 
-## Recent Changes (Last 5 Commits)
+## Recent Changes
 ```
+[Current commit] - Implement performance optimizations for backend and frontend
 ab5ca8d - itzpraveen, 11 minutes ago : Fix frontend serving: Move API status endpoint to /api to allow proper serving of React frontend
 d7027fd - itzpraveen, 19 minutes ago : Fix missing seed-railway.js error by updating Railway TOML configuration
 979430a - itzpraveen, 24 minutes ago : Fix Railway health check issues by improving startup reliability

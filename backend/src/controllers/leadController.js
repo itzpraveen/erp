@@ -86,13 +86,31 @@ const getLeads = async (req, res) => {
     const skip = (page - 1) * limit;
 
     try {
-      const leads = await Lead.find(filter)
-        .populate('assignedTo', 'name email')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit);
+      // Select only the fields needed for list view
+      const projection = {
+        name: 1,
+        email: 1,
+        phone: 1,
+        status: 1,
+        source: 1,
+        propertyType: 1,
+        assignedTo: 1,
+        createdAt: 1,
+        followUpDate: 1
+      };
+      
+      // Run queries in parallel for better performance
+      const [leads, totalLeads] = await Promise.all([
+        Lead.find(filter)
+          .select(projection)
+          .populate('assignedTo', 'name email')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(), // Convert to plain JS objects for faster serialization
 
-      const totalLeads = await Lead.countDocuments(filter);
+        Lead.countDocuments(filter)
+      ]);
 
       res.json({
         leads: leads || [],
@@ -136,121 +154,136 @@ const getLeadStats = async (req, res) => {
     let totalLeads = 0;
     let closedWonLeads = 0;
     let conversionRate = 0;
-
+    
+    // Get data for the last 6 months
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    // Run multiple aggregations in parallel for better performance
     try {
-      // Stats for leads by status
-      statusStats = await Lead.aggregate([
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-        { $sort: { _id: 1 } }
-      ]);
-    } catch (err) {
-      console.error('Error getting status stats:', err);
-    }
-
-    try {
-      // Stats for leads by source
-      sourceStats = await Lead.aggregate([
-        { $group: { _id: '$source', count: { $sum: 1 } } },
-        { $sort: { _id: 1 } }
-      ]);
-    } catch (err) {
-      console.error('Error getting source stats:', err);
-    }
-
-    try {
-      // Stats for leads by property type
-      propertyTypeStats = await Lead.aggregate([
-        { $group: { _id: '$propertyType', count: { $sum: 1 } } },
-        { $sort: { _id: 1 } }
-      ]);
-    } catch (err) {
-      console.error('Error getting property type stats:', err);
-    }
-
-    try {
-      // Get new leads per month (last 6 months)
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-      leadsByMonth = await Lead.aggregate([
-        { $match: { createdAt: { $gte: sixMonthsAgo } } },
-        {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' },
+      const [
+        statusStatsResult,
+        sourceStatsResult,
+        propertyTypeStatsResult,
+        leadsByMonthResult,
+        countData,
+        salesPerformanceResult
+      ] = await Promise.all([
+        // Stats for leads by status
+        Lead.aggregate([
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+          { $sort: { _id: 1 } }
+        ]),
+        
+        // Stats for leads by source
+        Lead.aggregate([
+          { $group: { _id: '$source', count: { $sum: 1 } } },
+          { $sort: { _id: 1 } }
+        ]),
+        
+        // Stats for leads by property type
+        Lead.aggregate([
+          { $group: { _id: '$propertyType', count: { $sum: 1 } } },
+          { $sort: { _id: 1 } }
+        ]),
+        
+        // Get new leads per month (last 6 months)
+        Lead.aggregate([
+          { $match: { createdAt: { $gte: sixMonthsAgo } } },
+          {
+            $group: {
+              _id: {
+                year: { $year: '$createdAt' },
+                month: { $month: '$createdAt' },
+              },
+              count: { $sum: 1 },
             },
-            count: { $sum: 1 },
           },
-        },
-        { $sort: { '_id.year': 1, '_id.month': 1 } },
-      ]);
-    } catch (err) {
-      console.error('Error getting leads by month:', err);
-    }
-
-    try {
-      // Get conversion rate (leads to closed_won)
-      totalLeads = await Lead.countDocuments();
-      closedWonLeads = await Lead.countDocuments({ status: 'closed_won' });
-      conversionRate = totalLeads > 0 ? (closedWonLeads / totalLeads) * 100 : 0;
-    } catch (err) {
-      console.error('Error getting conversion stats:', err);
-    }
-
-    try {
-      // Get sales rep performance
-      salesPerformance = await Lead.aggregate([
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'assignedTo',
-            foreignField: '_id',
-            as: 'assignedToUser'
-          }
-        },
-        { $unwind: { path: '$assignedToUser', preserveNullAndEmptyArrays: true } },
-        {
-          $group: {
-            _id: { 
-              userId: '$assignedTo', 
-              name: { $ifNull: ['$assignedToUser.name', 'Unassigned'] } 
-            },
-            totalLeads: { $sum: 1 },
-            qualifiedLeads: {
-              $sum: { $cond: [{ $in: ['$status', ['qualified', 'proposal', 'closed_won']] }, 1, 0] }
-            },
-            closedWon: { $sum: { $cond: [{ $eq: ['$status', 'closed_won'] }, 1, 0] } }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            userId: '$_id.userId',
-            name: '$_id.name',
-            totalLeads: 1,
-            qualifiedLeads: 1,
-            closedWon: 1,
-            qualificationRate: {
-              $cond: [
-                { $eq: ['$totalLeads', 0] },
-                0,
-                { $multiply: [{ $divide: ['$qualifiedLeads', '$totalLeads'] }, 100] }
-              ]
-            },
-            closingRate: {
-              $cond: [
-                { $eq: ['$qualifiedLeads', 0] },
-                0,
-                { $multiply: [{ $divide: ['$closedWon', '$qualifiedLeads'] }, 100] }
-              ]
+          { $sort: { '_id.year': 1, '_id.month': 1 } },
+        ]),
+        
+        // Get counts for conversion rate in a single query
+        Lead.aggregate([
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              closedWon: {
+                $sum: { $cond: [{ $eq: ['$status', 'closed_won'] }, 1, 0] }
+              }
             }
           }
-        },
-        { $sort: { closedWon: -1 } }
+        ]),
+        
+        // Get sales rep performance
+        Lead.aggregate([
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'assignedTo',
+              foreignField: '_id',
+              as: 'assignedToUser'
+            }
+          },
+          { $unwind: { path: '$assignedToUser', preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: { 
+                userId: '$assignedTo', 
+                name: { $ifNull: ['$assignedToUser.name', 'Unassigned'] } 
+              },
+              totalLeads: { $sum: 1 },
+              qualifiedLeads: {
+                $sum: { $cond: [{ $in: ['$status', ['qualified', 'proposal', 'closed_won']] }, 1, 0] }
+              },
+              closedWon: { $sum: { $cond: [{ $eq: ['$status', 'closed_won'] }, 1, 0] } }
+            }
+          },
+          {
+            $project: {
+              _id: 0,
+              userId: '$_id.userId',
+              name: '$_id.name',
+              totalLeads: 1,
+              qualifiedLeads: 1,
+              closedWon: 1,
+              qualificationRate: {
+                $cond: [
+                  { $eq: ['$totalLeads', 0] },
+                  0,
+                  { $multiply: [{ $divide: ['$qualifiedLeads', '$totalLeads'] }, 100] }
+                ]
+              },
+              closingRate: {
+                $cond: [
+                  { $eq: ['$qualifiedLeads', 0] },
+                  0,
+                  { $multiply: [{ $divide: ['$closedWon', '$qualifiedLeads'] }, 100] }
+                ]
+              }
+            }
+          },
+          { $sort: { closedWon: -1 } }
+        ])
       ]);
+      
+      // Assign results
+      statusStats = statusStatsResult;
+      sourceStats = sourceStatsResult;
+      propertyTypeStats = propertyTypeStatsResult;
+      leadsByMonth = leadsByMonthResult;
+      
+      // Set count data if available
+      if (countData && countData.length > 0) {
+        totalLeads = countData[0].total;
+        closedWonLeads = countData[0].closedWon;
+        conversionRate = totalLeads > 0 ? (closedWonLeads / totalLeads) * 100 : 0;
+      }
+      
+      salesPerformance = salesPerformanceResult;
+      
     } catch (err) {
-      console.error('Error getting sales performance:', err);
+      console.error('Error getting lead statistics:', err);
     }
 
     res.json({
@@ -285,7 +318,9 @@ const getLeadStats = async (req, res) => {
 // @access  Private
 const getLeadById = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id).populate('assignedTo', 'name email');
+    const lead = await Lead.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .lean(); // Use lean() for better performance
 
     if (lead) {
       // Check if user has access to this lead
@@ -395,9 +430,11 @@ const deleteLead = async (req, res) => {
 // @access  Private
 const getCustomers = async (req, res) => {
   try {
-    const customers = await Lead.find({})
+    // Only fetch active leads with status not 'lost'
+    const customers = await Lead.find({ status: { $ne: 'lost' } })
       .select('name email phone propertyType')
-      .sort({ name: 1 });
+      .sort({ name: 1 })
+      .lean();
     
     res.json(customers);
   } catch (error) {
