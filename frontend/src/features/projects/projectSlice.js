@@ -98,24 +98,18 @@ export const convertProposalToProject = createAsyncThunk(
         throw new Error('Only accepted proposals can be converted to projects');
       }
       
-      // Create project data from proposal
+      // Generate a unique contract number
+      const contractNumber = `PRJ${new Date().getFullYear().toString().substr(-2)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+      // Create project data that matches the backend model requirements
       const projectData = {
-        name: proposal.title || 'New Project',
-        customer: proposal.lead?._id,
-        contractNumber: `PRJ${new Date().getFullYear().toString().substr(-2)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-        location: proposal.lead?.address || '',
-        type: proposal.systemDetails?.batteryStorage ? 'hybrid' : 'on-grid',
-        startDate: new Date().toISOString().split('T')[0],
-        targetCompletionDate: proposal.estimatedInstallDate || new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-        capacity: proposal.systemDetails?.totalCapacity || 0,
-        notes: `Project created from proposal ${proposal._id}. \n\n${proposal.notes || ''}`,
-        budget: proposal.financialDetails?.netCost || proposal.financialDetails?.totalCost || 0,
-        status: 'planning',
-        progress: 0,
-        proposalId: proposal._id,
-        createdBy: userInfo._id,
-        createdAt: new Date().toISOString()
+        proposal: proposal._id, // This is required by the backend
+        contractNumber,
+        estimatedInstallDate: proposal.estimatedInstallDate,
+        notes: `Project created from proposal ${proposal._id}. \n\n${proposal.notes || ''}`
       };
+
+      console.log('Converting proposal to project with data:', projectData);
       
       // Create the project
       const response = await thunkAPI.dispatch(createProject(projectData)).unwrap();
