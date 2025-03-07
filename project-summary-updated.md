@@ -1,6 +1,6 @@
 # Project Summary: Solar Panel ERP System
 
-Updated on: Fri Mar 7 2025 - Updated Project Creation Process
+Updated on: Fri Mar 7 2025 - Fixed Project Creation and UI Loading
 
 ## Project Structure
 ```
@@ -148,6 +148,7 @@ Updated on: Fri Mar 7 2025 - Updated Project Creation Process
 ./frontend/src/components/SolarCalculator
 ./frontend/src/components/admin
 ./frontend/src/components/common
+./frontend/src/components/Loader.js  # Modern skeleton loader
 ```
 
 ## Environment Variables
@@ -221,13 +222,17 @@ services:
 
 ## Recent Changes
 ```
-[Current commit] - Fix project creation issues with existing customers
+[Current commit] - Simplify loader component to use only skeleton loading style
+[Previous commit] - Fix proposal to project conversion data format to match backend schema requirements
+[Previous commit] - Add modern loader components with skeleton and content placeholders
+[Previous commit] - Fix project API endpoint and improve loading animation
+[Previous commit] - Update project summary and remove duplicate
+[Previous commit] - Fix project creation issues with existing customers
 [Previous commit] - Fix deployment issues: Add cacheRoute function and fix rate limiter deprecation warning
 [Previous commit] - Implement performance optimizations and fix ESLint warnings
 ab5ca8d - itzpraveen : Fix frontend serving: Move API status endpoint to /api to allow proper serving of React frontend
 d7027fd - itzpraveen : Fix missing seed-railway.js error by updating Railway TOML configuration
 979430a - itzpraveen : Fix Railway health check issues by improving startup reliability
-b4ec80f - itzpraveen : Add AI collaboration tools and documentation
 ```
 
 ## Known Issues and Solutions
@@ -245,6 +250,12 @@ b4ec80f - itzpraveen : Add AI collaboration tools and documentation
    - Added duplicate contract number detection
    - Made the project manager field optional to prevent validation errors
    - Enhanced error handling in both backend and frontend
+
+6. **API Endpoint Configuration**: Fixed the API endpoint URL in the frontend project service to correctly include the `/api` prefix, resolving 404 errors when creating projects.
+
+7. **Project-Proposal Data Schema Mismatch**: Resolved mismatches between the frontend and backend data models for project creation. Updated the proposal-to-project conversion to send the correct fields that match the backend schema requirements.
+
+8. **Loading Animation**: Replaced the basic spinner with a modern skeleton loader that provides a better user experience by showing a preview of the content structure during loading.
 
 ## Performance Testing Notes
 * Dashboard page loading time improved by approximately 60%
