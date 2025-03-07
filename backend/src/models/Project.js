@@ -5,7 +5,28 @@ const projectSchema = mongoose.Schema(
     proposal: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Proposal',
+      required: false, // Not required for direct project creation
+    },
+    name: {
+      type: String,
       required: true,
+    },
+    location: {
+      type: String,
+      required: false,
+    },
+    capacity: {
+      type: Number,
+      required: false,
+    },
+    budget: {
+      type: Number,
+      required: false,
+    },
+    type: {
+      type: String,
+      enum: ['on-grid', 'off-grid', 'hybrid'],
+      default: 'on-grid',
     },
     customer: {
       type: mongoose.Schema.Types.ObjectId,

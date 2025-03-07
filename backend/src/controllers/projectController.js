@@ -47,10 +47,15 @@ const createDirectProject = async (req, res) => {
       });
     }
 
-    // Create a minimal project object that satisfies the schema
+    // Create a project object with all necessary fields from direct creation
     const projectData = {
+      name: name || `Project ${contractNumber}`,
       customer: customer,
       contractNumber: contractNumber,
+      location: location || '',
+      type: type || 'on-grid',
+      capacity: capacity ? parseFloat(capacity) : 0,
+      budget: budget ? parseFloat(budget) : 0,
       status: status || 'planning',
       timeline: {
         contractSigned: startDate ? new Date(startDate) : new Date(),
@@ -60,7 +65,8 @@ const createDirectProject = async (req, res) => {
         text: notes || `Project created directly: ${name}`,
         createdBy: req.user._id,
         createdAt: new Date()
-      }]
+      }],
+      paymentSchedule: [] // Initialize empty payment schedule
     };
 
     // Only add project manager if the user is available
@@ -250,14 +256,20 @@ const createProject = async (req, res) => {
     }
     
     const projectData = {
+      name: proposal.title || `Project ${contractNumber}`,
       proposal: proposalId,
       customer: customer._id, // Use customer ID instead of lead ID
       contractNumber,
+      type: proposal.systemDetails?.systemType || 'on-grid',
+      capacity: proposal.systemDetails?.totalCapacity || 0,
+      budget: proposal.financialDetails?.totalCost || 0,
+      location: proposal.lead?.address?.street ? `${proposal.lead.address.street}, ${proposal.lead.address.city || ''}` : 'Not specified',
       timeline: {
         contractSigned: new Date(),
         installationStart: estimatedInstallDate,
       },
       status: 'planning',
+      paymentSchedule: []
     };
     
     // Only add project manager if it's provided
@@ -420,6 +432,7 @@ const updateProject = async (req, res) => {
   if (project) {
     // Update fields
     const updatableFields = [
+      'name',
       'status',
       'timeline',
       'projectManager',
@@ -430,6 +443,10 @@ const updateProject = async (req, res) => {
       'paymentSchedule',
       'notes',
       'documents',
+      'location',
+      'type',
+      'capacity',
+      'budget',
     ];
 
     updatableFields.forEach((field) => {
@@ -448,6 +465,10 @@ const updateProject = async (req, res) => {
               project[field].push(item);
             });
           }
+        } else if (field === 'paymentSchedule') {
+          // Completely replace payment schedule
+          project[field] = req.body[field];
+          console.log(`Updated payment schedule to: ${JSON.stringify(req.body[field])}`);
         } else {
           project[field] = req.body[field];
         }

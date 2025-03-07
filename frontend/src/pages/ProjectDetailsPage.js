@@ -4,6 +4,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Row, Col, Card, Form, Button, Alert, Nav, Tab, Table, Badge, ListGroup } from 'react-bootstrap';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import ProjectFinancialSummary from '../components/projects/ProjectFinancialSummary';
+import ProjectForm from '../components/projects/ProjectForm';
 import { formatAddress, formatDate, formatStatus } from '../utils/formatters';
 import { getProjectById, resetProject, createProject, updateProject } from '../features/projects/projectSlice';
 import { getCustomers } from '../features/customers/customerSlice';
@@ -104,31 +106,12 @@ const ProjectDetailsPage = ({ mode }) => {
     }));
   };
   
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  // Handle form submission - enhanced version that supports payment schedules
+  const handleSubmit = (projectData) => {
     setSubmitError('');
     setSubmitSuccess(false);
     
-    // Form validation
-    const form = e.currentTarget;
-    if (form.checkValidity() === false) {
-      e.stopPropagation();
-      setValidated(true);
-      return;
-    }
-    
-    // Create a copy of the form data
-    const projectData = { ...formData };
-    
-    // Convert numeric values
-    if (projectData.capacity) {
-      projectData.capacity = parseFloat(projectData.capacity);
-    }
-    
-    if (projectData.budget) {
-      projectData.budget = parseFloat(projectData.budget);
-    }
+    console.log('Submitting project data:', projectData);
     
     try {
       if (isCreateMode) {
@@ -205,209 +188,15 @@ const ProjectDetailsPage = ({ mode }) => {
   // Render create/edit form
   const renderForm = () => {
     return (
-      <Card className="shadow-sm border-0">
-        <Card.Body>
-          <Form noValidate validated={validated} onSubmit={handleSubmit}>
-            <Row>
-              <Col md={6}>
-                <Form.Group controlId="name" className="mb-3">
-                  <Form.Label>Project Name</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter project name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">
-                    Please provide a project name.
-                  </Form.Control.Feedback>
-                </Form.Group>
-                
-                <Form.Group controlId="customer" className="mb-3">
-                  <Form.Label>Customer</Form.Label>
-                  <Form.Select
-                    name="customer"
-                    value={formData.customer}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Select Customer</option>
-                    {!customersLoading && customers && customers.length > 0 ? (
-                      customers.map((customer) => (
-                        <option key={customer._id} value={customer._id}>
-                          {customer.name}
-                        </option>
-                      ))
-                    ) : (
-                      <option disabled>Loading customers...</option>
-                    )}
-                  </Form.Select>
-                  <Form.Control.Feedback type="invalid">
-                    Please select a customer.
-                  </Form.Control.Feedback>
-                </Form.Group>
-                
-                <Form.Group controlId="contractNumber" className="mb-3">
-                  <Form.Label>Contract Number</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter contract number"
-                    name="contractNumber"
-                    value={formData.contractNumber}
-                    onChange={handleChange}
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">
-                    Please provide a contract number.
-                  </Form.Control.Feedback>
-                </Form.Group>
-                
-                <Form.Group controlId="location" className="mb-3">
-                  <Form.Label>Installation Location</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter installation location"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleChange}
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">
-                    Please provide an installation location.
-                  </Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              
-              <Col md={6}>
-                <Form.Group controlId="type" className="mb-3">
-                  <Form.Label>System Type</Form.Label>
-                  <Form.Select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                  >
-                    <option value="on-grid">On-Grid</option>
-                    <option value="off-grid">Off-Grid</option>
-                    <option value="hybrid">Hybrid</option>
-                  </Form.Select>
-                </Form.Group>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group controlId="startDate" className="mb-3">
-                      <Form.Label>Start Date</Form.Label>
-                      <Form.Control
-                        type="date"
-                        name="startDate"
-                        value={formData.startDate}
-                        onChange={handleChange}
-                        required
-                      />
-                      <Form.Control.Feedback type="invalid">
-                        Please select a start date.
-                      </Form.Control.Feedback>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group controlId="targetCompletionDate" className="mb-3">
-                      <Form.Label>Target Completion</Form.Label>
-                      <Form.Control
-                        type="date"
-                        name="targetCompletionDate"
-                        value={formData.targetCompletionDate}
-                        onChange={handleChange}
-                        required
-                      />
-                      <Form.Control.Feedback type="invalid">
-                        Please select a target completion date.
-                      </Form.Control.Feedback>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group controlId="capacity" className="mb-3">
-                      <Form.Label>System Capacity (KW)</Form.Label>
-                      <Form.Control
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Enter system capacity"
-                        name="capacity"
-                        value={formData.capacity}
-                        onChange={handleChange}
-                        required
-                      />
-                      <Form.Control.Feedback type="invalid">
-                        Please enter a valid capacity.
-                      </Form.Control.Feedback>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group controlId="budget" className="mb-3">
-                      <Form.Label>Budget (₹)</Form.Label>
-                      <Form.Control
-                        type="number"
-                        step="1000"
-                        min="0"
-                        placeholder="Enter project budget"
-                        name="budget"
-                        value={formData.budget}
-                        onChange={handleChange}
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Form.Group controlId="status" className="mb-3">
-                  <Form.Label>Project Status</Form.Label>
-                  <Form.Select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                  >
-                    <option value="planning">Planning</option>
-                    <option value="permitting">Permitting</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="inspection">Inspection</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-            
-            <Form.Group controlId="notes" className="mb-3">
-              <Form.Label>Project Notes</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={4}
-                placeholder="Enter any additional notes or information about the project"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-              />
-            </Form.Group>
-            
-            <div className="d-flex justify-content-end">
-              <Button 
-                variant="outline-secondary" 
-                className="me-2"
-                onClick={() => navigate('/projects')}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit">
-                {isCreateMode ? 'Create Project' : 'Update Project'}
-              </Button>
-            </div>
-          </Form>
-        </Card.Body>
-      </Card>
+      <ProjectForm
+        isCreateMode={isCreateMode}
+        customers={customers}
+        customersLoading={customersLoading}
+        initialData={formData}
+        onSubmit={handleSubmit}
+        submitSuccess={submitSuccess}
+        submitError={submitError}
+      />
     );
   };
 
@@ -499,6 +288,7 @@ const ProjectDetailsPage = ({ mode }) => {
               <Nav.Item>
                 <Nav.Link eventKey="payments">
                   <i className="fas fa-money-bill-wave me-2"></i> Payments
+                  <Badge bg="danger" className="ms-2" style={{ fontSize: '0.6rem' }}>New</Badge>
                 </Nav.Link>
               </Nav.Item>
               <Nav.Item>
@@ -891,55 +681,20 @@ const ProjectDetailsPage = ({ mode }) => {
               <Tab.Pane eventKey="payments">
                 <Card className="shadow-sm">
                   <Card.Header className="bg-white">
-                    <h5 className="mb-0">Payment Schedule</h5>
+                    <h5 className="mb-0">Project Financial Details</h5>
                   </Card.Header>
                   <Card.Body>
-                    {project.paymentSchedule && project.paymentSchedule.length > 0 ? (
-                      <Table bordered responsive>
-                        <thead>
-                          <tr>
-                            <th>Description</th>
-                            <th>Amount</th>
-                            <th>Due Date</th>
-                            <th>Status</th>
-                            <th>Payment Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {project.paymentSchedule.map((payment, index) => (
-                            <tr key={index}>
-                              <td>{payment.description}</td>
-                              <td>₹{payment.amount.toLocaleString()}</td>
-                              <td>{formatDate(payment.dueDate)}</td>
-                              <td>
-                                <Badge 
-                                  bg={
-                                    payment.status === 'paid' 
-                                      ? 'success' 
-                                      : payment.status === 'overdue' 
-                                      ? 'danger' 
-                                      : 'warning'
-                                  }
-                                >
-                                  {formatStatus(payment.status)}
-                                </Badge>
-                              </td>
-                              <td>{formatDate(payment.paymentDate)}</td>
-                            </tr>
-                          ))}
-                          <tr className="table-active">
-                            <td><strong>Total</strong></td>
-                            <td colSpan={4}>
-                              <strong>
-                                ₹{project.paymentSchedule.reduce((sum, payment) => sum + payment.amount, 0).toLocaleString()}
-                              </strong>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </Table>
-                    ) : (
-                      <Message variant="info">No payment schedule available</Message>
-                    )}
+                    <ProjectFinancialSummary 
+                      project={project} 
+                      onUpdatePaymentSchedule={(updatedPaymentSchedule) => {
+                        // Update project with new payment schedule
+                        const projectData = {
+                          ...project,
+                          paymentSchedule: updatedPaymentSchedule
+                        };
+                        dispatch(updateProject({ id: project._id, projectData }));
+                      }} 
+                    />
                   </Card.Body>
                 </Card>
               </Tab.Pane>

@@ -62,6 +62,11 @@ const createProject = async (projectData, token) => {
   try {
     console.log('Creating project with data:', projectData);
     
+    // Format the data properly for API compatibility
+    const formattedData = formatProjectData(projectData);
+    
+    console.log('Formatted project data for API:', formattedData);
+    
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +83,7 @@ const createProject = async (projectData, token) => {
       baseURL: api.defaults.baseURL
     });
 
-    const response = await api.post(API_URL, projectData, config);
+    const response = await api.post(API_URL, formattedData, config);
     console.log('Project created successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -99,23 +104,68 @@ const createProject = async (projectData, token) => {
   }
 };
 
-// Update a project
-const updateProject = async (id, projectData, token) => {
-  try {
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      timeout: 10000, // 10 second timeout
+// Helper function to format project data for the API
+const formatProjectData = (projectData) => {
+  // Check if this is a direct project creation (without a proposal)
+  const isDirectCreation = !projectData.proposal;
+  
+  if (isDirectCreation) {
+    console.log('Direct project creation detected');
+    
+    // Format the data for direct project creation
+    // This will map UI form fields to the backend model
+    return {
+      name: projectData.name || 'New Project',
+      customer: projectData.customer,
+      contractNumber: projectData.contractNumber,
+      location: projectData.location || '',
+      type: projectData.type || 'on-grid',
+      startDate: projectData.startDate || new Date().toISOString(),
+      targetCompletionDate: projectData.targetCompletionDate || '',
+      capacity: projectData.capacity || 0,
+      notes: projectData.notes || '',
+      budget: projectData.budget || 0,
+      status: projectData.status || 'planning',
+      paymentSchedule: projectData.paymentSchedule || [],
+      progress: calculateProjectProgress(projectData.status) || 0
     };
+  }
+  
+  // Format payment schedule data for both direct and proposal-based projects
+  // Ensure payment schedule is included in the formatted data
+  let formattedData = { ...projectData };
+  
+  // Make sure we have payment schedule array
+  if (!formattedData.paymentSchedule) {
+    formattedData.paymentSchedule = [];
+  }
+  
+  // Ensure all payment amounts are numbers, not strings
+  if (formattedData.paymentSchedule && formattedData.paymentSchedule.length > 0) {
+    formattedData.paymentSchedule = formattedData.paymentSchedule.map(payment => ({
+      ...payment,
+      amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount
+    }));
+  }
+  
+  return formattedData;
+};
 
-    const response = await api.put(`${API_URL}/${id}`, projectData, config);
-    return response.data;
-  } catch (error) {
-    throw handleError(error);
+// Calculate project progress based on status
+const calculateProjectProgress = (status) => {
+  switch (status) {
+    case 'planning': return 10;
+    case 'permitting': return 25;
+    case 'scheduled': return 40;
+    case 'in_progress': return 60;
+    case 'inspection': return 80;
+    case 'completed': return 100;
+    case 'cancelled': return 0;
+    default: return 0;
   }
 };
+
+// Function declaration removed - duplicated below
 
 // Get project statistics
 const getProjectStats = async (token) => {
@@ -141,12 +191,39 @@ const getProjectStats = async (token) => {
   }
 };
 
+// Update a project with proper formatting
+const updateProject = async (id, projectData, token) => {
+  try {
+    console.log('Updating project with data:', projectData);
+    
+    // Format the data properly for API compatibility
+    const formattedData = formatProjectData(projectData);
+    
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 10000, // 10 second timeout
+    };
+
+    const response = await api.put(`${API_URL}/${id}`, formattedData, config);
+    console.log('Project updated successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Project update error:', error);
+    throw handleError(error);
+  }
+};
+
 const projectService = {
   getProjects,
   getProjectById,
   createProject,
   updateProject,
-  getProjectStats
+  getProjectStats,
+  formatProjectData, // Export for testing
+  calculateProjectProgress // Export for testing
 };
 
 export default projectService;

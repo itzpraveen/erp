@@ -139,9 +139,12 @@ export const updateProject = createAsyncThunk(
   async ({ id, projectData }, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
+      // Log project update request for debugging
+      console.log('Updating project', id, 'with data:', projectData);
       return await projectService.updateProject(id, projectData, userInfo.token);
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      console.error('Project update error in slice:', error);
+      return thunkAPI.rejectWithValue(error.message || 'Failed to update project');
     }
   }
 );
