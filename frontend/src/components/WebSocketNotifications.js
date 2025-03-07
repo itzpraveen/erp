@@ -7,6 +7,11 @@ const WebSocketNotifications = () => {
   // Removed unused state variables for showConnectionErrors
   const [isConnected, setIsConnected] = useState(false);
   
+  // Dismiss a notification
+  const dismissNotification = useCallback((id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+  
   // Create the addNotification function with useCallback to prevent dependency issues
   const addNotification = useCallback((notification) => {
     const newNotification = {
@@ -24,12 +29,7 @@ const WebSocketNotifications = () => {
     setTimeout(() => {
       dismissNotification(newNotification.id);
     }, 5000);
-  }, []);
-  
-  // Dismiss a notification
-  const dismissNotification = useCallback((id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  }, []);
+  }, [dismissNotification]);
   
   useEffect(() => {
     // Don't try to initialize websocket if disabled

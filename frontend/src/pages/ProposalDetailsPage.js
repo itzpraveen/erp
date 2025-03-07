@@ -7,13 +7,11 @@ import {
   Col, 
   Card, 
   Button, 
-  ListGroup, 
   Form, 
   Alert, 
   Badge,
   Tab,
   Nav,
-  Table
 } from 'react-bootstrap';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
@@ -26,7 +24,6 @@ import {
 import { convertProposalToProject } from '../features/projects/projectSlice';
 import { getLeads } from '../features/leads/leadSlice';
 import { getLeadById } from '../features/leads/leadSlice';
-import { formatCurrency } from '../utils/formatters/currencyFormatter';
 
 const ProposalDetailsPage = ({ mode }) => {
   const { id } = useParams();
@@ -173,6 +170,15 @@ const ProposalDetailsPage = ({ mode }) => {
     }
   };
 
+  // Handle incentive field changes
+  const handleIncentiveChange = (e) => {
+    const { name, value } = e.target;
+    setNewIncentive(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   // Function to add incentive
   const handleAddIncentive = () => {
     if (newIncentive.name && newIncentive.amount) {
@@ -210,6 +216,15 @@ const ProposalDetailsPage = ({ mode }) => {
     
     // Recalculate net cost
     calculateNetCost();
+  };
+
+  // Handle financing option field changes
+  const handleFinancingOptionChange = (e) => {
+    const { name, value } = e.target;
+    setNewFinancingOption(prev => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   // Function to add financing option
@@ -251,24 +266,6 @@ const ProposalDetailsPage = ({ mode }) => {
         ...prevData.financialDetails,
         financingOptions: prevData.financialDetails.financingOptions.filter((_, i) => i !== index),
       },
-    }));
-  };
-
-  // Handle incentive field changes
-  const handleIncentiveChange = (e) => {
-    const { name, value } = e.target;
-    setNewIncentive(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  // Handle financing option field changes
-  const handleFinancingOptionChange = (e) => {
-    const { name, value } = e.target;
-    setNewFinancingOption(prev => ({
-      ...prev,
-      [name]: value,
     }));
   };
 

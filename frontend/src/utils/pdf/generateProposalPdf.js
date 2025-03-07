@@ -111,4 +111,5 @@ export const downloadProposalPdf = async (proposal, companyName) => {
   }
 };
 
-export default { generateProposalPdf, downloadProposalPdf };
+const exportedMethods = { generateProposalPdf, downloadProposalPdf };
+export default exportedMethods;

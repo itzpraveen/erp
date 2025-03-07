@@ -25,8 +25,7 @@ const ProposalsPage = () => {
   const dispatch = useDispatch();
 
   const { userInfo } = useSelector((state) => state.auth);
-  // Removed unused variables page and isSuccess
-  const { proposals, pages, isLoading, isError, message } = useSelector(
+  const { proposals, isLoading, isError, message } = useSelector(
     (state) => state.proposals
   );
 
