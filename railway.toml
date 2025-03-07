@@ -16,21 +16,3 @@ CI = "false"
 
 # Never define sensitive values like passwords or secrets here!
 # Use Railway's environment variables UI instead
-</function_results>
-
-<function_results>Successfully wrote to /Users/pravel/Music/erp/railway.toml</function_results>
-
-
-
-
-
-
-
-
-
-
-Let's commit and push these changes:
-
-<function_calls>
-<invoke name="write_to_terminal">
-<parameter name="command">cd /Users/pravel/Music/erp && git add backend/src/server.js railway.toml
