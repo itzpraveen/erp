@@ -1,6 +1,6 @@
 import api from '../../utils/api';
 
-const API_URL = '/projects';
+const API_URL = '/api/projects';
 
 // Error handling helper function
 const handleError = (error) => {
@@ -60,17 +60,41 @@ const getProjectById = async (id, token) => {
 // Create a new project
 const createProject = async (projectData, token) => {
   try {
+    console.log('Creating project with data:', projectData);
+    
     const config = {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      timeout: 10000, // 10 second timeout
+      timeout: 20000, // Increased timeout to 20 seconds
     };
 
+    // Log the request details
+    console.log('API Request:', {
+      url: API_URL,
+      method: 'POST',
+      headers: config.headers,
+      baseURL: api.defaults.baseURL
+    });
+
     const response = await api.post(API_URL, projectData, config);
+    console.log('Project created successfully:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Project creation error:', error);
+    
+    // Enhanced error logging
+    if (error.response) {
+      console.error('Server response:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    }
+    
     throw handleError(error);
   }
 };
