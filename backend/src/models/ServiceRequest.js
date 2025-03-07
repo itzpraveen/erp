@@ -5,7 +5,14 @@ const serviceRequestSchema = mongoose.Schema(
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Project',
-      required: true,
+      required: false,
+      validate: {
+        validator: function(v) {
+          // Allow null or valid ObjectId
+          return v === null || mongoose.Types.ObjectId.isValid(v);
+        },
+        message: props => `${props.value} is not a valid project reference!`
+      }
     },
     customer: {
       type: mongoose.Schema.Types.ObjectId,

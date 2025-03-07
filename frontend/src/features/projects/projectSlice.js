@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import projectService from './projectService';
+import { updateProposal } from '../proposals/proposalSlice';
 
 // Initial state
 const initialState = {
@@ -11,7 +12,12 @@ const initialState = {
   message: '',
   page: 1,
   pages: 1,
-  projectStats: null
+  projectStats: {
+    statusCounts: [],
+    avgTimelines: {},
+    upcomingInstallations: [],
+    projectsByMonth: []
+  }
 };
 
 // Get all projects
@@ -19,79 +25,8 @@ export const getProjects = createAsyncThunk(
   'projects/getAll',
   async (params, thunkAPI) => {
     try {
-      // This would be a real API call in a complete implementation
-      // For now, return mock data
-      return {
-        projects: [
-          {
-            _id: '1',
-            name: '35KW On-Grid Plant',
-            customer: 'KM Rexine',
-            location: 'Perinthalmanna',
-            status: 'planning',
-            contractNumber: 'PRJ2023-001',
-            startDate: '2023-03-15',
-            targetCompletionDate: '2023-05-20',
-            progress: 25,
-            type: 'on-grid',
-            capacity: 35
-          },
-          {
-            _id: '2',
-            name: '10KW Hybrid System',
-            customer: 'Govt FHC',
-            location: 'Kakkodi, Kozhikode',
-            status: 'testing',
-            contractNumber: 'PRJ2023-002',
-            startDate: '2023-02-10',
-            targetCompletionDate: '2023-03-30',
-            progress: 90,
-            type: 'hybrid',
-            capacity: 10
-          },
-          {
-            _id: '3',
-            name: '20KW On-Grid Installation',
-            customer: 'Janatha Home World',
-            location: 'Perinthalmanna',
-            status: 'installation',
-            contractNumber: 'PRJ2023-003',
-            startDate: '2023-02-25',
-            targetCompletionDate: '2023-04-15',
-            progress: 65,
-            type: 'on-grid',
-            capacity: 20
-          },
-          {
-            _id: '4',
-            name: '5KW Off-Grid System',
-            customer: 'Rajan Residence',
-            location: 'Wayanad',
-            status: 'completed',
-            contractNumber: 'PRJ2023-004',
-            startDate: '2023-01-10',
-            targetCompletionDate: '2023-02-15',
-            progress: 100,
-            type: 'off-grid',
-            capacity: 5
-          },
-          {
-            _id: '5',
-            name: '15KW Hybrid System',
-            customer: 'Green Valley Resort',
-            location: 'Munnar',
-            status: 'planning',
-            contractNumber: 'PRJ2023-005',
-            startDate: '2023-03-25',
-            targetCompletionDate: '2023-05-30',
-            progress: 10,
-            type: 'hybrid',
-            capacity: 15
-          }
-        ],
-        page: 1,
-        pages: 1
-      };
+      const { userInfo } = thunkAPI.getState().auth;
+      return await projectService.getProjects(userInfo.token, params);
     } catch (error) {
       return thunkAPI.rejectWithValue(error.message);
     }
@@ -103,27 +38,8 @@ export const getProjectById = createAsyncThunk(
   'projects/getById',
   async (id, thunkAPI) => {
     try {
-      // This would be a real API call in a complete implementation
-      // For now, return mock data
-      return {
-        _id: id,
-        name: 'Sample Project',
-        customer: {
-          _id: 'customer1',
-          name: 'Rajan Sharma',
-          email: 'rajan.sharma@example.com',
-          phone: '+91 9876543210'
-        },
-        contractNumber: `PRJ-${id.substring(0, 4)}`,
-        location: 'Sample Location',
-        type: 'on-grid',
-        startDate: '2023-03-15',
-        targetCompletionDate: '2023-05-20',
-        capacity: 25,
-        notes: 'Sample project notes',
-        budget: 150000,
-        status: 'planning'
-      };
+      const { userInfo } = thunkAPI.getState().auth;
+      return await projectService.getProjectById(id, userInfo.token);
     } catch (error) {
       return thunkAPI.rejectWithValue(error.message);
     }
@@ -135,27 +51,17 @@ export const getProjectStats = createAsyncThunk(
   'projects/getStats',
   async (_, thunkAPI) => {
     try {
-      // This would be a real API call in a complete implementation
-      // For now, return mock data
-      return {
-        statusCounts: [
-          { _id: 'planning', count: 2 },
-          { _id: 'installation', count: 1 },
-          { _id: 'testing', count: 1 },
-          { _id: 'completed', count: 1 }
-        ],
-        typeCounts: [
-          { _id: 'on-grid', count: 2 },
-          { _id: 'off-grid', count: 1 },
-          { _id: 'hybrid', count: 2 }
-        ],
-        totalProjects: 5,
-        active: 4,
-        completed: 1,
-        totalCapacity: 85
-      };
+      const { userInfo } = thunkAPI.getState().auth;
+      return await projectService.getProjectStats(userInfo.token);
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      // Return empty data instead of rejecting
+      console.error('Error fetching project stats:', error);
+      return {
+        statusCounts: [],
+        avgTimelines: {},
+        upcomingInstallations: [],
+        projectsByMonth: []
+      };
     }
   }
 );
@@ -165,14 +71,70 @@ export const createProject = createAsyncThunk(
   'projects/create',
   async (projectData, thunkAPI) => {
     try {
-      // This would be a real API call in a complete implementation
-      // For now, return mock data
-      return {
-        ...projectData,
-        _id: 'new-project-id'
-      };
+      const { userInfo } = thunkAPI.getState().auth;
+      return await projectService.createProject(projectData, userInfo.token);
     } catch (error) {
       return thunkAPI.rejectWithValue(error.message);
+    }
+  }
+);
+
+// Convert proposal to project
+export const convertProposalToProject = createAsyncThunk(
+  'projects/convertFromProposal',
+  async (proposalId, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+      const { proposals } = thunkAPI.getState().proposals;
+      
+      // Find the proposal by ID
+      const proposal = proposals.find(p => p._id === proposalId);
+      
+      if (!proposal) {
+        throw new Error('Proposal not found');
+      }
+      
+      if (proposal.status !== 'accepted') {
+        throw new Error('Only accepted proposals can be converted to projects');
+      }
+      
+      // Create project data from proposal
+      const projectData = {
+        name: proposal.title || 'New Project',
+        customer: proposal.lead?._id,
+        contractNumber: `PRJ${new Date().getFullYear().toString().substr(-2)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+        location: proposal.lead?.address || '',
+        type: proposal.systemDetails?.batteryStorage ? 'hybrid' : 'on-grid',
+        startDate: new Date().toISOString().split('T')[0],
+        targetCompletionDate: proposal.estimatedInstallDate || new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+        capacity: proposal.systemDetails?.totalCapacity || 0,
+        notes: `Project created from proposal ${proposal._id}. \n\n${proposal.notes || ''}`,
+        budget: proposal.financialDetails?.netCost || proposal.financialDetails?.totalCost || 0,
+        status: 'planning',
+        progress: 0,
+        proposalId: proposal._id,
+        createdBy: userInfo._id,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Create the project
+      const response = await thunkAPI.dispatch(createProject(projectData)).unwrap();
+      
+      // Update the proposal to mark it as converted
+      await thunkAPI.dispatch(updateProposal({
+        id: proposalId,
+        proposalData: {
+          ...proposal,
+          status: 'accepted',
+          convertedToProject: true,
+          projectId: response._id,
+          conversionDate: new Date().toISOString()
+        }
+      })).unwrap();
+      
+      return response;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.message || 'Failed to convert proposal to project');
     }
   }
 );
@@ -182,12 +144,8 @@ export const updateProject = createAsyncThunk(
   'projects/update',
   async ({ id, projectData }, thunkAPI) => {
     try {
-      // This would be a real API call in a complete implementation
-      // For now, return mock data
-      return {
-        ...projectData,
-        _id: id
-      };
+      const { userInfo } = thunkAPI.getState().auth;
+      return await projectService.updateProject(id, projectData, userInfo.token);
     } catch (error) {
       return thunkAPI.rejectWithValue(error.message);
     }
@@ -229,7 +187,11 @@ export const projectSlice = createSlice({
       .addCase(getProjects.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
-        state.message = action.payload;
+        state.message = action.payload || 'Failed to fetch projects';
+        // Provide empty data to prevent component errors
+        state.projects = [];
+        state.page = 1;
+        state.pages = 1;
       })
       // Get project by ID
       .addCase(getProjectById.pending, (state) => {
@@ -286,6 +248,21 @@ export const projectSlice = createSlice({
         );
       })
       .addCase(updateProject.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Convert proposal to project
+      .addCase(convertProposalToProject.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(convertProposalToProject.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.project = action.payload;
+        state.projects.push(action.payload);
+      })
+      .addCase(convertProposalToProject.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

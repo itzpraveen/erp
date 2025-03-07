@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import { formatDate, formatStatus } from '../utils/formatters';
 import { getServiceRequests, resetServiceRequests } from '../features/serviceRequests/serviceRequestSlice';
 
 const ServiceRequestsPage = () => {
@@ -37,13 +38,12 @@ const ServiceRequestsPage = () => {
       if (typeFilter) params.requestType = typeFilter;
       if (warrantyFilter) params.warrantyRelated = warrantyFilter === 'yes';
 
+      // Always fetch fresh data from the database
       dispatch(getServiceRequests(params));
     }
 
-    // Clean up function
-    return () => {
-      dispatch(resetServiceRequests());
-    };
+    // Clean up function - don't reset on unmount to avoid data flashing
+    return () => {};
   }, [dispatch, navigate, userInfo, statusFilter, priorityFilter, typeFilter, warrantyFilter]);
 
   // Handle page change
@@ -105,14 +105,9 @@ const ServiceRequestsPage = () => {
     }
   };
 
-  // Format date
-  const formatDate = (date) => {
-    return date ? new Date(date).toLocaleDateString() : 'N/A';
-  };
-
   // Format request type
   const formatRequestType = (type) => {
-    return type.replace('_', ' ');
+    return formatStatus(type);
   };
 
   return (
@@ -242,6 +237,7 @@ const ServiceRequestsPage = () => {
                     <th>ID</th>
                     <th>Title</th>
                     <th>Project</th>
+                    <th>Customer</th>
                     <th>Type</th>
                     <th>Status</th>
                     <th>Priority</th>
@@ -259,6 +255,13 @@ const ServiceRequestsPage = () => {
                           <span>{request.project.contractNumber}</span>
                         ) : (
                           <span className="text-muted">Standalone</span>
+                        )}
+                      </td>
+                      <td>
+                        {request.customer?.name ? (
+                          <span>{request.customer.name}</span>
+                        ) : (
+                          <span className="text-muted">Unknown</span>
                         )}
                       </td>
                       <td>

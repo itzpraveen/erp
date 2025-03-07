@@ -24,6 +24,7 @@ import {
   updateProposal,
   addProposalDocument 
 } from '../features/proposals/proposalSlice';
+import { convertProposalToProject } from '../features/projects/projectSlice';
 import { getLeads } from '../features/leads/leadSlice';
 import { getLeadById } from '../features/leads/leadSlice';
 import { formatCurrency } from '../utils/formatters/currencyFormatter';
@@ -930,6 +931,35 @@ const ProposalDetailsPage = ({ mode }) => {
               >
                 <i className="fas fa-file-pdf"></i> Export PDF
               </Button>
+              <Button
+                variant="info"
+                className="me-2"
+                onClick={() => navigate(`/proposals/${proposal._id}/approval`)}
+              >
+                <i className="fas fa-check-circle"></i> Approval Workflow
+              </Button>
+              {proposal.status === 'accepted' && !proposal.convertedToProject && (
+                <Button
+                  variant="success"
+                  className="me-2"
+                  onClick={() => {
+                    if (window.confirm('Convert this accepted proposal to a project? This will create a new project with details from this proposal.')) {
+                      dispatch(convertProposalToProject(proposal._id))
+                        .unwrap()
+                        .then((project) => {
+                          alert('Project created successfully!');
+                          navigate('/projects');
+                        })
+                        .catch(err => {
+                          console.error('Failed to convert proposal to project:', err);
+                          alert('Failed to convert proposal to project: ' + err);
+                        });
+                    }
+                  }}
+                >
+                  <i className="fas fa-project-diagram"></i> Convert to Project
+                </Button>
+              )}
               {proposal.status === 'draft' && (
                 <Button
                   variant="success"
@@ -1017,6 +1047,21 @@ const ProposalDetailsPage = ({ mode }) => {
                     <ListGroup.Item>
                       <strong>Version:</strong> {proposal.version || 1}
                     </ListGroup.Item>
+                    {proposal.convertedToProject && (
+                      <ListGroup.Item>
+                        <strong>Converted to Project:</strong>{' '}
+                        <Badge bg="success">Yes</Badge>{' '}
+                        {proposal.projectId && (
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            onClick={() => navigate(`/projects/${proposal.projectId}`)}
+                          >
+                            View Project
+                          </Button>
+                        )}
+                      </ListGroup.Item>
+                    )}
                   </ListGroup>
                 </Card>
 

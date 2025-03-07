@@ -4,7 +4,13 @@ import api from '../../utils/api';
 const initialState = {
   leads: [],
   lead: null,
-  leadStats: null,
+  leadStats: {
+    statusCounts: [],
+    sourceCounts: [],
+    conversionRate: 0,
+    leadsByMonth: [],
+    salesPerformance: [],
+  },
   page: 1,
   pages: 1,
   total: 0,
@@ -28,7 +34,7 @@ export const getLeads = createAsyncThunk(
         params,
       };
 
-      const { data } = await api.get('/api/leads', config);
+      const { data } = await api.get('/leads', config);
       return data;
     } catch (error) {
       const message =
@@ -53,7 +59,7 @@ export const getLeadById = createAsyncThunk(
         },
       };
 
-      const { data } = await api.get(`/api/leads/${id}`, config);
+      const { data } = await api.get(`/leads/${id}`, config);
       return data;
     } catch (error) {
       const message =
@@ -79,7 +85,7 @@ export const createLead = createAsyncThunk(
         },
       };
 
-      const { data } = await api.post('/api/leads', leadData, config);
+      const { data } = await api.post('/leads', leadData, config);
       return data;
     } catch (error) {
       const message =
@@ -105,7 +111,7 @@ export const updateLead = createAsyncThunk(
         },
       };
 
-      const { data } = await api.put(`/api/leads/${id}`, leadData, config);
+      const { data } = await api.put(`/leads/${id}`, leadData, config);
       return data;
     } catch (error) {
       const message =
@@ -132,7 +138,7 @@ export const assignLead = createAsyncThunk(
       };
 
       const { data } = await api.put(
-        `/api/leads/${id}/assign`,
+        `/leads/${id}/assign`,
         { userId },
         config
       );
@@ -160,7 +166,7 @@ export const getLeadStats = createAsyncThunk(
         },
       };
 
-      const { data } = await api.get('/api/leads/stats', config);
+      const { data } = await api.get('/leads/stats', config);
       return data;
     } catch (error) {
       const message =
@@ -275,7 +281,18 @@ export const leadSlice = createSlice({
       .addCase(getLeadStats.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
-        state.message = action.payload;
+        state.message = action.payload || 'Failed to fetch lead statistics';
+        // Provide empty data to prevent component errors
+        state.leadStats = {
+          statusCounts: [],
+          sourceCounts: [],
+          propertyTypeStats: [],
+          leadsByMonth: [],
+          conversionRate: 0,
+          salesPerformance: [],
+          totalLeads: 0,
+          closedWonLeads: 0
+        };
       });
   },
 });

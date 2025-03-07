@@ -18,8 +18,11 @@ const customerSchema = mongoose.Schema(
       type: String,
     },
     address: {
-      type: String,
-      required: true,
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
     },
     type: {
       type: String,

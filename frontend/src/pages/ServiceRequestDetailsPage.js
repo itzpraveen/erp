@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { getCustomers } from '../features/customers/customerSlice';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { formatAddress, formatDate, formatDateTime, formatStatus } from '../utils/formatters';
 import {
   Row,
   Col,
@@ -17,6 +19,7 @@ import {
 } from 'react-bootstrap';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import ServiceRequestForm from '../components/ServiceRequestForm';
 import {
   getServiceRequestById,
   resetServiceRequest,
@@ -26,6 +29,7 @@ import {
   addServiceRequestParts,
   addCustomerFeedback
 } from '../features/serviceRequests/serviceRequestSlice';
+import { getProjects } from '../features/projects/projectSlice';
 
 const ServiceRequestDetailsPage = ({ mode }) => {
   const { id } = useParams();
@@ -85,19 +89,25 @@ const ServiceRequestDetailsPage = ({ mode }) => {
   const { serviceRequest, isLoading, isError, isSuccess, message } = useSelector(
     (state) => state.serviceRequests
   );
+  const { projects } = useSelector((state) => state.projects);
+  const { customers } = useSelector((state) => state.customers);
   const { userInfo } = useSelector((state) => state.auth);
 
   // Load service request if in edit or view mode
   useEffect(() => {
     if (!userInfo) {
       navigate('/login');
-    } else if (!isCreateMode && id) {
-      dispatch(getServiceRequestById(id));
+    } else {
+      // Load projects and customers for dropdowns - always fetch fresh data
+      dispatch(getProjects());
+      dispatch(getCustomers());
+      
+      if (!isCreateMode && id) {
+        dispatch(getServiceRequestById(id));
+      }
     }
 
-    return () => {
-      dispatch(resetServiceRequest());
-    };
+    // Don't reset on cleanup to avoid flash
   }, [dispatch, navigate, userInfo, id, isCreateMode]);
 
   // Populate form with existing service request data when loaded
@@ -269,10 +279,10 @@ const ServiceRequestDetailsPage = ({ mode }) => {
       });
   };
 
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+  // Format date is now coming from the utility functions
+  // This keeps the function name the same but delegates to the utility
+  const formatLocalDateTime = (dateString) => {
+    return formatDateTime(dateString);
   };
 
   // Get status badge variant
@@ -324,180 +334,45 @@ const ServiceRequestDetailsPage = ({ mode }) => {
         
         {isLoading && <Loader />}
         {isError && <Message variant="danger">{message}</Message>}
-        {submitError && (
-          <Alert variant="danger">
-            <Alert.Heading>Error</Alert.Heading>
-            <p>{submitError}</p>
-          </Alert>
-        )}
-        {submitSuccess && (
-          <Alert variant="success">
-            <Alert.Heading>
-              {isCreateMode ? 'Service Request Created!' : 'Service Request Updated!'}
-            </Alert.Heading>
-            <p>
-              {isCreateMode 
-                ? 'Your service request has been successfully created.' 
-                : 'Your service request has been successfully updated.'}
-            </p>
-          </Alert>
-        )}
         
         <Card>
           <Card.Body>
-            <Form noValidate validated={validated} onSubmit={handleSubmit}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group controlId="project" className="mb-3">
-                    <Form.Label>Project (Optional)</Form.Label>
-                    <Form.Control
-                      as="select"
-                      name="project"
-                      value={formData.project}
-                      onChange={handleChange}
-                      disabled={!!projectId || !isCreateMode}
-                    >
-                      <option value="">Select Project (Optional)</option>
-                      {/* Project options would be populated from API */}
-                      <option value="project1">Project 1</option>
-                      <option value="project2">Project 2</option>
-                    </Form.Control>
-                    <Form.Text className="text-muted">
-                      Leave blank for standalone service not related to any project
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group controlId="customer" className="mb-3">
-                    <Form.Label>Customer</Form.Label>
-                    <Form.Control
-                      as="select"
-                      name="customer"
-                      value={formData.customer}
-                      onChange={handleChange}
-                      required
-                      disabled={!isCreateMode}
-                    >
-                      <option value="">Select Customer</option>
-                      {/* Customer options would be populated from API */}
-                      <option value="customer1">Customer 1</option>
-                      <option value="customer2">Customer 2</option>
-                    </Form.Control>
-                    <Form.Control.Feedback type="invalid">
-                      Please select a customer.
-                    </Form.Control.Feedback>
-                  </Form.Group>
-
-                  <Form.Group controlId="title" className="mb-3">
-                    <Form.Label>Title</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="Enter service request title"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleChange}
-                      required
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      Please provide a title.
-                    </Form.Control.Feedback>
-                  </Form.Group>
-                </Col>
-
-                <Col md={6}>
-                  <Form.Group controlId="requestType" className="mb-3">
-                    <Form.Label>Request Type</Form.Label>
-                    <Form.Control
-                      as="select"
-                      name="requestType"
-                      value={formData.requestType}
-                      onChange={handleChange}
-                      required
-                    >
-                      <option value="maintenance">Maintenance</option>
-                      <option value="repair">Repair</option>
-                      <option value="inspection">Inspection</option>
-                      <option value="warranty_claim">Warranty Claim</option>
-                      <option value="system_upgrade">System Upgrade</option>
-                      <option value="other">Other</option>
-                    </Form.Control>
-                  </Form.Group>
-
-                  <Form.Group controlId="priority" className="mb-3">
-                    <Form.Label>Priority</Form.Label>
-                    <Form.Control
-                      as="select"
-                      name="priority"
-                      value={formData.priority}
-                      onChange={handleChange}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical</option>
-                    </Form.Control>
-                  </Form.Group>
-
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group controlId="scheduledDate" className="mb-3">
-                        <Form.Label>Scheduled Date</Form.Label>
-                        <Form.Control
-                          type="date"
-                          name="scheduledDate"
-                          value={formData.scheduledDate}
-                          onChange={handleChange}
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group controlId="estimatedHours" className="mb-3">
-                        <Form.Label>Estimated Hours</Form.Label>
-                        <Form.Control
-                          type="number"
-                          step="0.5"
-                          placeholder="Enter estimated hours"
-                          name="estimatedHours"
-                          value={formData.estimatedHours}
-                          onChange={handleChange}
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </Col>
-              </Row>
-
-              <Form.Group controlId="description" className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={4}
-                  placeholder="Enter detailed description of the service request"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  required
-                />
-                <Form.Control.Feedback type="invalid">
-                  Please provide a description.
-                </Form.Control.Feedback>
-              </Form.Group>
-
-              <Form.Group controlId="warrantyRelated" className="mb-3">
-                <Form.Check
-                  type="checkbox"
-                  label="This is a warranty-related request"
-                  name="warrantyRelated"
-                  checked={formData.warrantyRelated}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-
-              <div className="d-flex justify-content-end">
-                <Button variant="primary" type="submit">
-                  {isCreateMode ? 'Create Service Request' : 'Update Service Request'}
-                </Button>
-              </div>
-            </Form>
+            <ServiceRequestForm 
+              onSubmit={(requestData, setSuccess, setError) => {
+                if (isCreateMode) {
+                  dispatch(createServiceRequest(requestData))
+                    .unwrap()
+                    .then((result) => {
+                      setSuccess(true);
+                      // Redirect after a short delay to show success message
+                      setTimeout(() => {
+                        navigate(`/service-requests/${result._id}`, { state: { freshCreated: true } });
+                      }, 1000);
+                    })
+                    .catch(err => {
+                      console.error('Failed to create service request:', err);
+                      setError(err || 'Failed to create service request. Please try again.');
+                    });
+                } else if (isEditMode) {
+                  dispatch(updateServiceRequest({ id, requestData }))
+                    .unwrap()
+                    .then(() => {
+                      setSuccess(true);
+                      // Redirect after a short delay to show success message
+                      setTimeout(() => {
+                        navigate(`/service-requests/${id}`);
+                      }, 1000);
+                    })
+                    .catch(err => {
+                      console.error('Failed to update service request:', err);
+                      setError(err || 'Failed to update service request. Please try again.');
+                    });
+                }
+              }}
+              initialData={serviceRequest || formData}
+              mode={mode}
+              projectId={projectId}
+            />
           </Card.Body>
         </Card>
       </>
@@ -574,18 +449,18 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                     </ListGroup.Item>
                     <ListGroup.Item>
                       <strong>Created:</strong>{' '}
-                      {formatDate(serviceRequest.createdAt)}
+                      {formatLocalDateTime(serviceRequest.createdAt)}
                     </ListGroup.Item>
                     {serviceRequest.scheduledDate && (
                       <ListGroup.Item>
                         <strong>Scheduled:</strong>{' '}
-                        {formatDate(serviceRequest.scheduledDate)}
+                        {formatLocalDateTime(serviceRequest.scheduledDate)}
                       </ListGroup.Item>
                     )}
                     {serviceRequest.completionDate && (
                       <ListGroup.Item>
                         <strong>Completed:</strong>{' '}
-                        {formatDate(serviceRequest.completionDate)}
+                        {formatLocalDateTime(serviceRequest.completionDate)}
                       </ListGroup.Item>
                     )}
                   </ListGroup>
@@ -653,7 +528,7 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                       <Card.Body>
                         <h5>{serviceRequest.title}</h5>
                         <p className="text-muted">
-                          Created on {formatDate(serviceRequest.createdAt)}
+                          Created on {formatLocalDateTime(serviceRequest.createdAt)}
                           {serviceRequest.assignedTo && (
                             <span> • Assigned to {serviceRequest.assignedTo.name}</span>
                           )}
@@ -671,7 +546,7 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                               {serviceRequest.resolution.description}
                             </Card.Text>
                             <p className="text-muted">
-                              Resolved on {formatDate(serviceRequest.resolution.date)}
+                              Resolved on {formatLocalDateTime(serviceRequest.resolution.date)}
                               {serviceRequest.resolution.resolvedBy && (
                                 <span> by {serviceRequest.resolution.resolvedBy.name}</span>
                               )}
@@ -768,7 +643,7 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                             {serviceRequest.customer.address && (
                               <p>
                                 <i className="fas fa-map-marker-alt me-2"></i>
-                                {serviceRequest.customer.address}
+                                {formatAddress(serviceRequest.customer.address)}
                               </p>
                             )}
                           </>
@@ -841,7 +716,7 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                                   <Card.Body>
                                     <Card.Text>{note.text}</Card.Text>
                                     <small className="text-muted">
-                                      {formatDate(note.createdAt)}
+                                      {formatLocalDateTime(note.createdAt)}
                                       {note.createdBy && (
                                         <span> by {note.createdBy.name || 'User'}</span>
                                       )}
@@ -953,7 +828,7 @@ const ServiceRequestDetailsPage = ({ mode }) => {
                           )}
                           
                           <p className="text-muted mt-3">
-                            Feedback provided on {formatDate(serviceRequest.customerFeedback.date)}
+                            Feedback provided on {formatLocalDateTime(serviceRequest.customerFeedback.date)}
                           </p>
                         </Card.Body>
                       </Card>

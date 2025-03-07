@@ -19,13 +19,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: erp-backend
-    ports:
-      - "5001:5001"
+    # Note: removed direct exposure of port since we'll use nginx to proxy
+    expose:
+      - "5001"
     environment:
       - NODE_ENV=development
       - PORT=5001
-      - MONGO_URI=mongodb://mongodb:27017/solar-erp
-      - JWT_SECRET=erp-secret-key-development
+      - MONGO_URI=mongodb://mongodb:27017/erp
+      - JWT_SECRET=${JWT_SECRET:-erp-secret-key-development}
     depends_on:
       - mongodb
     volumes:
@@ -41,16 +42,30 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: erp-frontend
-    ports:
-      - "3002:3001"
+    # Note: removed direct exposure of port since we'll use nginx to proxy
+    expose:
+      - "3001"
     depends_on:
       - backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
     restart: always
-    environment:
-      - REACT_APP_API_URL=http://erp-backend:5001
+    networks:
+      - erp-network
+  
+  # Nginx Service for routing
+  nginx:
+    image: nginx:alpine
+    container_name: erp-nginx
+    ports:
+      - "3002:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+    restart: always
     networks:
       - erp-network
 

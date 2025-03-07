@@ -4,38 +4,52 @@ import { initSocket, addMessageHandler, removeMessageHandler } from '../utils/we
 
 const WebSocketNotifications = () => {
   const [notifications, setNotifications] = useState([]);
-  const [showConnectionErrors, setShowConnectionErrors] = useState(false); // Default to not showing connection errors
+  const [showConnectionErrors, setShowConnectionErrors] = useState(false); // Don't show connection errors by default
+  const [isConnected, setIsConnected] = useState(false);
   
   useEffect(() => {
-    // Check if we should try to connect to WebSocket
-    // In development, we might not have the backend running
-    // This is a simple way to prevent connection errors from being shown
-    if (!showConnectionErrors) {
+    // Don't try to initialize websocket if disabled
+    if (sessionStorage.getItem('disableWebsocket') === 'true') {
       return;
     }
 
     // Initialize WebSocket
-    initSocket();
+    const socket = initSocket();
+    if (socket) {
+      socket.addEventListener('open', () => {
+        setIsConnected(true);
+        // Add a success notification only if connection was previously lost
+        if (!isConnected) {
+          addNotification({
+            title: 'WebSocket Connected',
+            message: 'Real-time notifications are now enabled',
+            type: 'success'
+          });
+        }
+      });
+
+      socket.addEventListener('close', () => {
+        // Only show notification if we were previously connected
+        if (isConnected) {
+          setIsConnected(false);
+          addNotification({
+            title: 'WebSocket Disconnected',
+            message: 'Real-time updates are temporarily disabled',
+            type: 'warning'
+          });
+        }
+      });
+    }
     
     // Create handler for incoming messages
     const handleWebSocketMessage = (data) => {
       if (data.type === 'notification' || data.type === 'connection') {
         // Create a notification object
-        const newNotification = {
-          id: Date.now(),
-          title: data.type === 'connection' ? 'WebSocket Connected' : data.title || 'Notification',
+        addNotification({
+          title: data.title || 'Notification',
           message: data.message || 'You have a new notification',
-          timestamp: new Date().toISOString(),
           type: data.notificationType || 'info'
-        };
-        
-        // Add the notification to state
-        setNotifications(prev => [...prev, newNotification]);
-        
-        // Auto-dismiss after 5 seconds
-        setTimeout(() => {
-          dismissNotification(newNotification.id);
-        }, 5000);
+        });
       }
     };
     
@@ -46,7 +60,25 @@ const WebSocketNotifications = () => {
     return () => {
       removeMessageHandler(handleWebSocketMessage);
     };
-  }, [showConnectionErrors]);
+  }, [isConnected]);
+
+  const addNotification = (notification) => {
+    const newNotification = {
+      id: Date.now(),
+      title: notification.title,
+      message: notification.message,
+      timestamp: new Date().toISOString(),
+      type: notification.type
+    };
+    
+    // Add the notification to state
+    setNotifications(prev => [...prev, newNotification]);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      dismissNotification(newNotification.id);
+    }, 5000);
+  };
   
   // Dismiss a notification
   const dismissNotification = (id) => {

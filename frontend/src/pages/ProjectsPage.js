@@ -1,112 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Button, Card, Table, Badge, Form, Tabs, Tab, ProgressBar } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import { formatDate, formatStatus } from '../utils/formatters';
+import { getProjects, resetProjects } from '../features/projects/projectSlice';
 
 const ProjectsPage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('all');
-  const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
-  const [projects, setProjects] = useState([]);
-  const [customers, setCustomers] = useState([]);
+
+  // Get projects from Redux
+  const { projects, isLoading, isError, message } = useSelector(
+    (state) => state.projects
+  );
 
   useEffect(() => {
-    setIsLoading(true);
+    // Fetch projects from Redux
+    dispatch(getProjects());
     
-    // Load customers from localStorage
-    const storedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
-    setCustomers(storedCustomers);
-    
-    // Load projects from localStorage or use default data if none exists
-    const storedProjects = JSON.parse(localStorage.getItem('projects') || '[]');
-    
-    if (storedProjects.length > 0) {
-      setProjects(storedProjects);
-    } else {
-      // Default sample projects if none in localStorage
-      const defaultProjects = [
-        {
-          _id: '1',
-          name: '35KW On-Grid Plant',
-          customer: '5', // KM Rexine
-          location: 'Perinthalmanna',
-          status: 'planning',
-          contractNumber: 'PRJ2023-001',
-          startDate: '2023-03-15',
-          targetCompletionDate: '2023-05-20',
-          progress: 25,
-          type: 'on-grid',
-          capacity: 35,
-          createdAt: '2023-03-01',
-        },
-        {
-          _id: '2',
-          name: '10KW Hybrid System',
-          customer: '3', // Govt FHC
-          location: 'Kakkodi, Kozhikode',
-          status: 'testing',
-          contractNumber: 'PRJ2023-002',
-          startDate: '2023-02-10',
-          targetCompletionDate: '2023-03-30',
-          progress: 90,
-          type: 'hybrid',
-          capacity: 10,
-          createdAt: '2023-02-01',
-        },
-        {
-          _id: '3',
-          name: '20KW On-Grid Installation',
-          customer: '4', // Janatha Home World
-          location: 'Perinthalmanna',
-          status: 'installation',
-          contractNumber: 'PRJ2023-003',
-          startDate: '2023-02-25',
-          targetCompletionDate: '2023-04-15',
-          progress: 65,
-          type: 'on-grid',
-          capacity: 20,
-          createdAt: '2023-02-15',
-        },
-        {
-          _id: '4',
-          name: '5KW Off-Grid System',
-          customer: '1', // Rajan Sharma
-          location: 'Wayanad',
-          status: 'completed',
-          contractNumber: 'PRJ2023-004',
-          startDate: '2023-01-10',
-          targetCompletionDate: '2023-02-15',
-          progress: 100,
-          type: 'off-grid',
-          capacity: 5,
-          createdAt: '2023-01-01',
-        },
-        {
-          _id: '5',
-          name: '15KW Hybrid System',
-          customer: '2', // Green Valley Resort
-          location: 'Munnar',
-          status: 'planning',
-          contractNumber: 'PRJ2023-005',
-          startDate: '2023-03-25',
-          targetCompletionDate: '2023-05-30',
-          progress: 10,
-          type: 'hybrid',
-          capacity: 15,
-          createdAt: '2023-03-10',
-        }
-      ];
-      
-      // Save default projects to localStorage
-      localStorage.setItem('projects', JSON.stringify(defaultProjects));
-      setProjects(defaultProjects);
+    // Cleanup function
+    return () => {
+      dispatch(resetProjects());
+    };
+  }, [dispatch]);
+  
+  // Log projects data for debugging
+  useEffect(() => {
+    if (projects.length > 0) {
+      console.log('Projects from Redux:', projects);
+      console.log('Customers in projects:', projects.map(p => ({
+        id: p._id,
+        customerObj: p.customer,
+        customerRef: typeof p.customer === 'string' ? p.customer : 'object'
+      })));
     }
-    
-    setIsLoading(false);
-  }, []);
+  }, [projects]);
 
   // Filter projects based on status and active tab
   const filteredProjects = projects.filter((project) => {
@@ -143,20 +75,8 @@ const ProjectsPage = () => {
       case 'hybrid':
         return <Badge bg="info" className="text-white">Hybrid</Badge>;
       default:
-        return <Badge bg="secondary" className="text-white">{type}</Badge>;
+        return <Badge bg="secondary" className="text-white">{formatStatus(type)}</Badge>;
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-  
-  // Get customer name by ID
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => String(c._id) === String(customerId));
-    return customer ? customer.name : 'Unknown';
   };
 
   return (
@@ -224,6 +144,8 @@ const ProjectsPage = () => {
 
       {isLoading ? (
         <Loader />
+      ) : isError ? (
+        <Message variant="danger">{message}</Message>
       ) : filteredProjects.length === 0 ? (
         <Message variant="info">
           No projects found
@@ -254,10 +176,10 @@ const ProjectsPage = () => {
                 {filteredProjects.map((project) => (
                   <tr key={project._id}>
                     <td>{project.contractNumber}</td>
-                    <td>{project.name}</td>
-                    <td>{getCustomerName(project.customer)}</td>
+                    <td>{project.proposal?.title || project.name}</td>
+                    <td>{project.customer?.name || 'Unknown'}</td>
                     <td>{getTypeBadge(project.type)}</td>
-                    <td>{project.capacity}KW</td>
+                    <td>{project.proposal?.systemDetails?.totalCapacity || project.capacity}KW</td>
                     <td>{getStatusBadge(project.status)}</td>
                     <td>
                       <div className="d-flex align-items-center">

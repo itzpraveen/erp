@@ -9,7 +9,7 @@ const projectSchema = mongoose.Schema(
     },
     customer: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Lead',
+      ref: 'Customer',
       required: true,
     },
     contractNumber: {

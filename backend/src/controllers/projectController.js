@@ -1,54 +1,136 @@
 const Project = require('../models/Project');
 const Proposal = require('../models/Proposal');
+const Customer = require('../models/Customer');
+const Lead = require('../models/Lead');
 
 // @desc    Create a new project from an accepted proposal
 // @route   POST /api/projects
 // @access  Private/Admin or Manager
 const createProject = async (req, res) => {
-  const {
-    proposal: proposalId,
-    contractNumber,
-    projectManager,
-    estimatedInstallDate,
-  } = req.body;
+  try {
+    const {
+      proposal: proposalId,
+      contractNumber,
+      projectManager,
+      estimatedInstallDate,
+    } = req.body;
 
-  // Validate proposal exists and is accepted
-  const proposal = await Proposal.findById(proposalId).populate('lead');
-  if (!proposal) {
-    res.status(404);
-    throw new Error('Proposal not found');
-  }
+    console.log("Creating project from proposal ID:", proposalId);
 
-  if (proposal.status !== 'accepted') {
-    res.status(400);
-    throw new Error('Cannot create project from unaccepted proposal');
-  }
+    // Validate proposal exists and is accepted
+    const proposal = await Proposal.findById(proposalId);
+    if (!proposal) {
+      console.error("Proposal not found with ID:", proposalId);
+      return res.status(404).json({ message: 'Proposal not found' });
+    }
+    
+    // Populate lead data
+    await proposal.populate('lead');
+    if (!proposal.lead) {
+      console.error("Lead not found for proposal:", proposalId);
+      return res.status(404).json({ message: 'Lead information is missing for this proposal' });
+    }
 
-  // Check if project already exists for this proposal
-  const existingProject = await Project.findOne({ proposal: proposalId });
-  if (existingProject) {
-    res.status(400);
-    throw new Error('Project already exists for this proposal');
+    if (proposal.status !== 'accepted') {
+      return res.status(400).json({ message: 'Cannot create project from unaccepted proposal' });
+    }
+
+    // Check if project already exists for this proposal
+    const existingProject = await Project.findOne({ proposal: proposalId });
+    if (existingProject) {
+      return res.status(400).json({ message: 'Project already exists for this proposal' });
+    }
+
+    // Convert lead to customer or get existing customer
+    let customer;
+    
+    // First check if customer already exists with this email
+    if (proposal.lead.email) {
+      customer = await Customer.findOne({ email: proposal.lead.email });
+      console.log(`Checking for existing customer with email ${proposal.lead.email}:`, customer ? 'Found' : 'Not found');
+    }
+    
+    if (!customer) {
+      // Create new customer from lead data
+      const leadData = proposal.lead;
+      
+      // Format address if it exists
+      let formattedAddress = 'Address not provided';
+      if (leadData.address) {
+        const parts = [];
+        if (leadData.address.street) parts.push(leadData.address.street);
+      if (leadData.address.city) parts.push(leadData.address.city);
+      if (leadData.address.state) parts.push(leadData.address.state);
+      if (leadData.address.zipCode) parts.push(leadData.address.zipCode);
+      if (leadData.address.country) parts.push(leadData.address.country);
+      
+      if (parts.length > 0) {
+        formattedAddress = parts.join(', ');
+      }
+    }
+    
+    try {
+      console.log("Creating new customer from lead data:", {
+        name: leadData.name,
+        email: leadData.email,
+        phone: leadData.phone
+      });
+      
+      customer = await Customer.create({
+        name: leadData.name,
+        email: leadData.email,
+        phone: leadData.phone,
+        address: formattedAddress,
+        type: leadData.propertyType === 'residential' ? 'residential' : 'commercial',
+        status: 'active',
+        notes: `Converted from lead ID: ${leadData._id}\n\n${leadData.notes || ''}`,
+      });
+      
+      // Update lead status to closed_won
+      await Lead.findByIdAndUpdate(leadData._id, { status: 'closed_won' });
+    } catch (err) {
+      console.error("Error creating customer:", err.message);
+      return res.status(500).json({ message: 'Failed to create customer from lead data', error: err.message });
+    }
   }
 
   // Create project
-  const project = await Project.create({
-    proposal: proposalId,
-    customer: proposal.lead._id,
-    contractNumber,
-    projectManager,
-    timeline: {
-      contractSigned: new Date(),
-      installationStart: estimatedInstallDate,
-    },
-    status: 'planning',
-  });
+  try {
+    console.log("Creating project with customer ID:", customer._id);
+    
+    const project = await Project.create({
+      proposal: proposalId,
+      customer: customer._id, // Use customer ID instead of lead ID
+      contractNumber,
+      projectManager,
+      timeline: {
+        contractSigned: new Date(),
+        installationStart: estimatedInstallDate,
+      },
+      status: 'planning',
+    });
 
-  if (project) {
-    res.status(201).json(project);
-  } else {
-    res.status(400);
-    throw new Error('Invalid project data');
+    if (project) {
+      // Update customer's totalProjects count
+      await Customer.findByIdAndUpdate(customer._id, { $inc: { totalProjects: 1 } });
+      
+      // Fully populate the project for response
+      const populatedProject = await Project.findById(project._id)
+        .populate('customer', 'name email phone')
+        .populate('projectManager', 'name email')
+        .populate('proposal', 'title systemDetails.totalCapacity');
+        
+      return res.status(201).json(populatedProject);
+    } else {
+      return res.status(400).json({ message: 'Invalid project data' });
+    }
+  } catch (err) {
+    console.error("Error creating project:", err.message);
+    return res.status(500).json({ message: 'Failed to create project', error: err.message });
+  }
+  } catch (error) {
+    console.error("Project creation error:", error.message);
+    return res.status(500).json({ message: 'Error creating project', error: error.message });
   }
 };
 
@@ -56,49 +138,72 @@ const createProject = async (req, res) => {
 // @route   GET /api/projects
 // @access  Private
 const getProjects = async (req, res) => {
-  // Create filter for query
-  const filter = {};
+  try {
+    // Create filter for query
+    const filter = {};
 
-  // Add filters from query params
-  if (req.query.status) {
-    filter.status = req.query.status;
+    // Add filters from query params
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+
+    if (req.query.customer) {
+      filter.customer = req.query.customer;
+    }
+
+    if (req.query.projectManager) {
+      filter.projectManager = req.query.projectManager;
+    }
+
+    // Technicians can only see projects they're assigned to
+    if (req.user.role === 'technician') {
+      filter.installationTeam = req.user._id;
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    try {
+      const projects = await Project.find(filter)
+        .populate('customer', 'name email phone type status contactPerson')
+        .populate('projectManager', 'name email department')
+        .populate('installationTeam', 'name email department')
+        .populate('proposal', 'title systemDetails.totalCapacity systemDetails.panelType')
+        .sort({ 'timeline.contractSigned': -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const totalProjects = await Project.countDocuments(filter);
+
+      // Handle empty results or failures gracefully
+      res.json({
+        projects: projects || [],
+        page,
+        pages: Math.ceil(totalProjects / limit) || 1,
+        total: totalProjects || 0,
+      });
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+      // Return empty results instead of an error
+      res.json({
+        projects: [],
+        page: 1,
+        pages: 1,
+        total: 0,
+      });
+    }
+  } catch (error) {
+    console.error('Project listing error:', error);
+    // Return empty results rather than a 500 error
+    res.json({
+      projects: [],
+      page: 1,
+      pages: 1,
+      total: 0,
+    });
   }
-
-  if (req.query.customer) {
-    filter.customer = req.query.customer;
-  }
-
-  if (req.query.projectManager) {
-    filter.projectManager = req.query.projectManager;
-  }
-
-  // Technicians can only see projects they're assigned to
-  if (req.user.role === 'technician') {
-    filter.installationTeam = req.user._id;
-  }
-
-  // Pagination
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
-
-  const projects = await Project.find(filter)
-    .populate('customer', 'name email phone')
-    .populate('projectManager', 'name email')
-    .populate('installationTeam', 'name email')
-    .populate('proposal', 'title systemDetails.totalCapacity')
-    .sort({ 'timeline.contractSigned': -1 })
-    .skip(skip)
-    .limit(limit);
-
-  const totalProjects = await Project.countDocuments(filter);
-
-  res.json({
-    projects,
-    page,
-    pages: Math.ceil(totalProjects / limit),
-    total: totalProjects,
-  });
 };
 
 // @desc    Get project by ID
@@ -310,136 +415,171 @@ const addInspectionDetails = async (req, res) => {
 // @route   GET /api/projects/stats
 // @access  Private/Admin or Manager
 const getProjectStats = async (req, res) => {
-  // Get counts by status
-  const statusCounts = await Project.aggregate([
-    { $group: { _id: '$status', count: { $sum: 1 } } },
-  ]);
+  try {
+    // Default values in case of errors
+    let statusCounts = [];
+    let avgTimelines = {};
+    let upcomingInstallations = [];
+    let projectsByMonth = [];
 
-  // Get average timeline durations
-  const avgTimelines = await Project.aggregate([
-    {
-      $match: {
-        'timeline.contractSigned': { $exists: true },
-        'timeline.completionDate': { $exists: true },
-      },
-    },
-    {
-      $project: {
-        totalDuration: {
-          $divide: [
-            {
-              $subtract: [
-                '$timeline.completionDate',
-                '$timeline.contractSigned',
-              ],
-            },
-            // Convert milliseconds to days
-            1000 * 60 * 60 * 24,
-          ],
+    try {
+      // Get counts by status
+      statusCounts = await Project.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]);
+    } catch (err) {
+      console.error('Error getting status counts:', err);
+    }
+
+    try {
+      // Get average timeline durations
+      const avgTimelinesResult = await Project.aggregate([
+        {
+          $match: {
+            'timeline.contractSigned': { $exists: true },
+            'timeline.completionDate': { $exists: true },
+          },
         },
-        permitDuration: {
-          $cond: {
-            if: {
-              $and: [
-                { $exists: ['$timeline.permitSubmitted', true] },
-                { $exists: ['$timeline.permitApproved', true] },
-              ],
-            },
-            then: {
+        {
+          $project: {
+            totalDuration: {
               $divide: [
                 {
                   $subtract: [
-                    '$timeline.permitApproved',
-                    '$timeline.permitSubmitted',
+                    '$timeline.completionDate',
+                    '$timeline.contractSigned',
                   ],
                 },
+                // Convert milliseconds to days
                 1000 * 60 * 60 * 24,
               ],
             },
-            else: null,
-          },
-        },
-        installationDuration: {
-          $cond: {
-            if: {
-              $and: [
-                { $exists: ['$timeline.installationStart', true] },
-                { $exists: ['$timeline.installationEnd', true] },
-              ],
-            },
-            then: {
-              $divide: [
-                {
-                  $subtract: [
-                    '$timeline.installationEnd',
-                    '$timeline.installationStart',
+            permitDuration: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $exists: ['$timeline.permitSubmitted', true] },
+                    { $exists: ['$timeline.permitApproved', true] },
                   ],
                 },
-                1000 * 60 * 60 * 24,
-              ],
+                then: {
+                  $divide: [
+                    {
+                      $subtract: [
+                        '$timeline.permitApproved',
+                        '$timeline.permitSubmitted',
+                      ],
+                    },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                else: null,
+              },
             },
-            else: null,
+            installationDuration: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $exists: ['$timeline.installationStart', true] },
+                    { $exists: ['$timeline.installationEnd', true] },
+                  ],
+                },
+                then: {
+                  $divide: [
+                    {
+                      $subtract: [
+                        '$timeline.installationEnd',
+                        '$timeline.installationStart',
+                      ],
+                    },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                else: null,
+              },
+            },
           },
         },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        avgTotalDuration: { $avg: '$totalDuration' },
-        avgPermitDuration: { $avg: '$permitDuration' },
-        avgInstallationDuration: { $avg: '$installationDuration' },
-      },
-    },
-  ]);
-
-  // Upcoming installations (next 30 days)
-  const today = new Date();
-  const thirtyDaysFromNow = new Date();
-  thirtyDaysFromNow.setDate(today.getDate() + 30);
-
-  const upcomingInstallations = await Project.find({
-    'timeline.installationStart': {
-      $gte: today,
-      $lte: thirtyDaysFromNow,
-    },
-  })
-    .populate('customer', 'name')
-    .populate('projectManager', 'name')
-    .sort({ 'timeline.installationStart': 1 })
-    .limit(10)
-    .select(
-      'contractNumber timeline.installationStart customer projectManager status'
-    );
-
-  // Projects by month (last 12 months)
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
-  const projectsByMonth = await Project.aggregate([
-    {
-      $match: {
-        'timeline.contractSigned': { $gte: twelveMonthsAgo },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$timeline.contractSigned' },
-          month: { $month: '$timeline.contractSigned' },
+        {
+          $group: {
+            _id: null,
+            avgTotalDuration: { $avg: '$totalDuration' },
+            avgPermitDuration: { $avg: '$permitDuration' },
+            avgInstallationDuration: { $avg: '$installationDuration' },
+          },
         },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1 } },
-  ]);
+      ]);
 
-  res.json({
-    statusCounts,
-    avgTimelines: avgTimelines.length > 0 ? avgTimelines[0] : {},
-    upcomingInstallations,
-    projectsByMonth,
-  });
+      avgTimelines = avgTimelinesResult.length > 0 ? avgTimelinesResult[0] : {};
+    } catch (err) {
+      console.error('Error getting average timelines:', err);
+    }
+
+    try {
+      // Upcoming installations (next 30 days)
+      const today = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+      upcomingInstallations = await Project.find({
+        'timeline.installationStart': {
+          $gte: today,
+          $lte: thirtyDaysFromNow,
+        },
+      })
+        .populate('customer', 'name')
+        .populate('projectManager', 'name')
+        .sort({ 'timeline.installationStart': 1 })
+        .limit(10)
+        .select(
+          'contractNumber timeline.installationStart customer projectManager status'
+        );
+    } catch (err) {
+      console.error('Error getting upcoming installations:', err);
+    }
+
+    try {
+      // Projects by month (last 12 months)
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      projectsByMonth = await Project.aggregate([
+        {
+          $match: {
+            'timeline.contractSigned': { $gte: twelveMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$timeline.contractSigned' },
+              month: { $month: '$timeline.contractSigned' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]);
+    } catch (err) {
+      console.error('Error getting projects by month:', err);
+    }
+
+    res.json({
+      statusCounts,
+      avgTimelines,
+      upcomingInstallations,
+      projectsByMonth,
+    });
+  } catch (error) {
+    console.error('Error getting project stats:', error);
+    // Return empty data instead of an error
+    res.json({
+      statusCounts: [],
+      avgTimelines: {},
+      upcomingInstallations: [],
+      projectsByMonth: [],
+    });
+  }
 };
 
 module.exports = {

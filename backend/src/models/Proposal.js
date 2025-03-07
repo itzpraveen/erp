@@ -97,6 +97,59 @@ const financialDetailsSchema = mongoose.Schema(
   { _id: false }
 );
 
+const approvalSchema = mongoose.Schema(
+  {
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    approvedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    comments: {
+      type: String,
+    },
+    status: {
+      type: String,
+      enum: ['approved', 'rejected', 'pending_changes', 'submitted'],
+      default: 'submitted',
+    },
+  },
+  { _id: false }
+);
+
+const adjustmentRequestSchema = mongoose.Schema(
+  {
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    field: {
+      type: String,
+    },
+    currentValue: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    requestedValue: {
+      type: mongoose.Schema.Types.Mixed,
+    },
+    comments: {
+      type: String,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'implemented', 'rejected'],
+      default: 'pending',
+    },
+  },
+  { _id: false }
+);
+
 const proposalSchema = mongoose.Schema(
   {
     title: {
@@ -119,6 +172,31 @@ const proposalSchema = mongoose.Schema(
       enum: ['draft', 'sent', 'negotiating', 'accepted', 'rejected'],
       default: 'draft',
     },
+    // New approval workflow fields
+    approvalStatus: {
+      type: String,
+      enum: ['draft', 'submitted', 'manager_approved', 'admin_approved', 'rejected'],
+      default: 'draft',
+    },
+    approvalHistory: [approvalSchema],
+    currentApprover: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    finalApproval: {
+      approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      approvedAt: {
+        type: Date,
+      },
+      comments: {
+        type: String,
+      },
+    },
+    adjustmentRequests: [adjustmentRequestSchema],
+    // End of new approval workflow fields
     estimatedInstallDate: {
       type: Date,
     },
@@ -149,6 +227,18 @@ const proposalSchema = mongoose.Schema(
         notes: String,
       },
     ],
+    previousVersions: [{
+      data: {
+        type: mongoose.Schema.Types.Mixed,
+      },
+      updatedAt: {
+        type: Date,
+      },
+      updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    }],
   },
   {
     timestamps: true,
@@ -210,6 +300,110 @@ proposalSchema.methods.formatCurrency = function (amount) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
+};
+
+// Approval workflow methods
+proposalSchema.methods.submitForApproval = function(userId) {
+  this.approvalStatus = 'submitted';
+  this.approvalHistory.push({
+    approvedBy: userId,
+    status: 'submitted',
+    comments: 'Proposal submitted for approval',
+  });
+  
+  return this.save();
+};
+
+proposalSchema.methods.approveByManager = function(managerId, comments) {
+  this.approvalStatus = 'manager_approved';
+  this.approvalHistory.push({
+    approvedBy: managerId,
+    status: 'approved',
+    comments: comments || 'Approved by manager',
+  });
+  
+  return this.save();
+};
+
+proposalSchema.methods.finalApproveByAdmin = function(adminId, comments) {
+  this.approvalStatus = 'admin_approved';
+  this.finalApproval = {
+    approvedBy: adminId,
+    approvedAt: new Date(),
+    comments: comments || 'Final approval by admin',
+  };
+  this.approvalHistory.push({
+    approvedBy: adminId,
+    status: 'approved',
+    comments: comments || 'Final approval by admin',
+  });
+  
+  // Also update the status to accepted
+  this.status = 'accepted';
+  
+  return this.save();
+};
+
+proposalSchema.methods.requestAdjustments = function(userId, adjustments) {
+  this.approvalStatus = 'submitted'; // Reset to submitted
+  
+  // Add each adjustment request
+  adjustments.forEach(adjustment => {
+    this.adjustmentRequests.push({
+      requestedBy: userId,
+      field: adjustment.field,
+      currentValue: adjustment.currentValue,
+      requestedValue: adjustment.requestedValue,
+      comments: adjustment.comments,
+    });
+  });
+  
+  this.approvalHistory.push({
+    approvedBy: userId,
+    status: 'pending_changes',
+    comments: 'Adjustments requested',
+  });
+  
+  return this.save();
+};
+
+proposalSchema.methods.implementAdjustments = function(userId) {
+  // Save current version before implementing changes
+  const currentData = this.toObject();
+  delete currentData._id;
+  delete currentData.previousVersions;
+  
+  this.previousVersions.push({
+    data: currentData,
+    updatedAt: new Date(),
+    updatedBy: userId,
+  });
+  
+  this.version += 1;
+  
+  // Mark all pending adjustments as implemented
+  this.adjustmentRequests.forEach(adjustment => {
+    if (adjustment.status === 'pending') {
+      adjustment.status = 'implemented';
+    }
+  });
+  
+  // Change status back to submitted
+  this.approvalStatus = 'submitted';
+  
+  return this.save();
+};
+
+proposalSchema.methods.reject = function(userId, reason) {
+  this.approvalStatus = 'rejected';
+  this.status = 'rejected';
+  this.approvalHistory.push({
+    approvedBy: userId,
+    status: 'rejected',
+    comments: reason || 'Proposal rejected',
+  });
+  
+  return this.save();
 };
 
 const Proposal = mongoose.model('Proposal', proposalSchema);

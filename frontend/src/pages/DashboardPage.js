@@ -10,18 +10,27 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { userInfo } = useSelector((state) => state.auth);
+  const { userInfo, isAuthenticated, isCheckingAuth } = useSelector((state) => state.auth);
   const { leadStats, isLoading, isError, message } = useSelector(
     (state) => state.leads
   );
 
   useEffect(() => {
-    if (!userInfo) {
-      navigate('/login');
-    } else {
-      dispatch(getLeadStats());
+    // Wait until auth check is complete
+    if (!isCheckingAuth) {
+      // Redirect to login if not authenticated
+      if (!userInfo || !isAuthenticated) {
+        navigate('/login');
+      } else {
+        dispatch(getLeadStats());
+      }
     }
-  }, [navigate, userInfo, dispatch]);
+  }, [navigate, userInfo, isAuthenticated, isCheckingAuth, dispatch]);
+
+  // Show loading state while checking authentication or not authenticated yet
+  if (isCheckingAuth || !userInfo) {
+    return <Loader />;
+  }
 
   return (
     <>
@@ -61,10 +70,10 @@ const DashboardPage = () => {
                     <Card.Title as="h4" className="mb-0">Leads</Card.Title>
                   </div>
                   <Card.Text className="mb-3">
-                    {leadStats?.statusCounts?.reduce(
+                    {(leadStats?.statusCounts?.length > 0 ? leadStats.statusCounts.reduce(
                       (acc, stat) => acc + stat.count,
                       0
-                    ) || 0}{' '}
+                    ) : 0) || 0}{' '}
                     total leads to manage
                   </Card.Text>
                   <Link to="/leads" className="btn btn-primary">
@@ -129,7 +138,7 @@ const DashboardPage = () => {
                 </Card.Body>
               </Card>
             </Col>
-            {userInfo.role === 'admin' && (
+            {userInfo && userInfo.role === 'admin' && (
               <Col md={4}>
                 <Card className="mb-4 shadow-sm border-0">
                   <Card.Body className="p-4">
@@ -170,21 +179,21 @@ const DashboardPage = () => {
                   <div className="p-3 border-bottom d-flex justify-content-between align-items-center">
                     <div>
                       <h6 className="mb-1">Annual Maintenance</h6>
-                      <p className="text-muted mb-0 small">Customer: Green Valley Resort • PRJ2023-005</p>
+                      <p className="text-muted mb-0 small">Customer: Green Valley Resort • <span className="text-muted">Standalone</span></p>
                     </div>
                     <Badge bg="warning">Scheduled</Badge>
                   </div>
                   <div className="p-3 border-bottom d-flex justify-content-between align-items-center">
                     <div>
                       <h6 className="mb-1">Battery Replacement</h6>
-                      <p className="text-muted mb-0 small">Customer: Govt FHC • PRJ2023-002</p>
+                      <p className="text-muted mb-0 small">Customer: Govt FHC • <span className="text-muted">Standalone</span></p>
                     </div>
                     <Badge bg="primary">In Progress</Badge>
                   </div>
                   <div className="p-3 d-flex justify-content-between align-items-center">
                     <div>
                       <h6 className="mb-1">System Performance Check</h6>
-                      <p className="text-muted mb-0 small">Customer: Janatha Home World • PRJ2023-003</p>
+                      <p className="text-muted mb-0 small">Customer: Janatha Home World • <span className="text-muted">Standalone</span></p>
                     </div>
                     <Badge bg="success">Completed</Badge>
                   </div>
@@ -193,7 +202,7 @@ const DashboardPage = () => {
             </Col>
           </Row>
 
-          {leadStats && (
+          {leadStats && leadStats.statusCounts && leadStats.statusCounts.length > 0 && (
             <Row className="mt-4">
               <h3 className="mb-3">Analytics</h3>
               <Col md={6}>
@@ -202,7 +211,7 @@ const DashboardPage = () => {
                     <h5 className="mb-0"><i className="fas fa-chart-pie me-2 text-primary"></i>Lead Status</h5>
                   </Card.Header>
                   <Card.Body>
-                    {leadStats.statusCounts.map((stat) => {
+                    {leadStats.statusCounts.map((stat, index) => {
                       const total = leadStats.statusCounts.reduce((sum, s) => sum + s.count, 0);
                       const percentage = total > 0 ? Math.round((stat.count / total) * 100) : 0;
                       let badgeColor = 'primary';
@@ -218,7 +227,7 @@ const DashboardPage = () => {
                       }
                       
                       return (
-                        <div key={stat._id} className="mb-3">
+                        <div key={stat._id || index} className="mb-3">
                           <div className="d-flex justify-content-between align-items-center mb-1">
                             <div>
                               <span className={`badge bg-${badgeColor} me-2`}>{stat._id || 'Unknown'}</span>
@@ -242,6 +251,7 @@ const DashboardPage = () => {
                   </Card.Body>
                 </Card>
               </Col>
+              {leadStats.sourceCounts && leadStats.sourceCounts.length > 0 && (
               <Col md={6}>
                 <Card className="shadow-sm border-0">
                   <Card.Header className="bg-white border-bottom py-3">
@@ -255,7 +265,7 @@ const DashboardPage = () => {
                       const colorIndex = index % colors.length;
                       
                       return (
-                        <div key={stat._id} className="mb-3">
+                        <div key={stat._id || `source-${index}`} className="mb-3">
                           <div className="d-flex justify-content-between align-items-center mb-1">
                             <div>
                               <span className="me-2">{stat._id || 'Unknown'}</span>
@@ -279,6 +289,7 @@ const DashboardPage = () => {
                   </Card.Body>
                 </Card>
               </Col>
+              )}
             </Row>
           )}
         </>

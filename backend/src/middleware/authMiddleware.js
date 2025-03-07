@@ -1,34 +1,64 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+/**
+ * Authentication middleware
+ * Checks for JWT token in various possible locations
+ */
 const protect = async (req, res, next) => {
   let token;
 
+  // Check authorization header first (most common)
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(' ')[1];
+  } 
+  // Check for token in cookies
+  else if (req.cookies && req.cookies.jwt) {
+    token = req.cookies.jwt;
+  }
+  // Also check query parameter for token (for some clients)
+  else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
 
+  if (token) {
+    try {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
+      const user = await User.findById(decoded.id).select('-password');
+      
+      // Check if user exists and is active
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+      
+      if (!user.active) {
+        return res.status(401).json({ message: 'User account is inactive' });
+      }
 
+      // Set user in request object
+      req.user = user;
       next();
     } catch (error) {
-      console.error('Auth middleware error:', error);
-      res.status(401);
-      throw new Error('Not authorized, token failed');
+      console.error('Auth middleware error:', error.message);
+      
+      // Provide specific error message based on error type
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Token expired, please log in again' });
+      } else if (error.name === 'JsonWebTokenError') {
+        return res.status(401).json({ message: 'Invalid token, please log in again' });
+      } else {
+        return res.status(401).json({ message: 'Not authorized, authentication failed' });
+      }
     }
   } else {
-    // For routes that use the protect middleware, require authentication
-    console.log('No token provided, authentication required');
-    res.status(401);
-    throw new Error('Not authorized, no token');
+    // For routes checking authentication status, just return 401 without crashing
+    return res.status(401).json({ message: 'Not authorized, no token provided' });
   }
 };
 

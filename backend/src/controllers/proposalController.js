@@ -34,6 +34,7 @@ const createProposal = async (req, res) => {
       systemDetails,
       financialDetails,
       status: status || 'draft',
+      approvalStatus: 'draft',
       estimatedInstallDate,
       notes,
       createdBy: req.user._id,
@@ -93,6 +94,11 @@ const getProposals = async (req, res) => {
       filter.customer = req.query.customer;
     }
     
+    // Add approval status filter
+    if (req.query.approvalStatus) {
+      filter.approvalStatus = req.query.approvalStatus;
+    }
+    
     // Add search functionality
     if (req.query.search) {
       filter.$text = { $search: req.query.search };
@@ -146,6 +152,7 @@ const getProposals = async (req, res) => {
           _id: 1,
           title: 1,
           status: 1,
+          approvalStatus: 1,
           systemDetails: 1,
           financialDetails: 1,
           estimatedInstallDate: 1,
@@ -198,6 +205,11 @@ const getProposals = async (req, res) => {
       { $match: filter },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
+    
+    const approvalStatusCounts = await Proposal.aggregate([
+      { $match: filter },
+      { $group: { _id: '$approvalStatus', count: { $sum: 1 } } },
+    ]);
 
     res.json({
       proposals,
@@ -208,6 +220,7 @@ const getProposals = async (req, res) => {
         averageSystemSize: averageSystemSize.length > 0 ? averageSystemSize[0].averageSize : 0,
         averageCost: averageCost.length > 0 ? averageCost[0].averageCost : 0,
         statusCounts,
+        approvalStatusCounts,
       },
     });
   } catch (error) {
@@ -227,7 +240,10 @@ const getProposalById = async (req, res) => {
       .populate('lead', 'name email phone')
       .populate('customer', 'name email phone type address')
       .populate('createdBy', 'name email')
-      .populate('history.updatedBy', 'name email');
+      .populate('history.updatedBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role')
+      .populate('finalApproval.approvedBy', 'name email role')
+      .populate('adjustmentRequests.requestedBy', 'name email role');
 
     if (proposal) {
       res.json(proposal);
@@ -314,7 +330,8 @@ const updateProposal = async (req, res) => {
         .populate('lead', 'name email phone')
         .populate('customer', 'name email phone')
         .populate('createdBy', 'name email')
-        .populate('history.updatedBy', 'name email');
+        .populate('history.updatedBy', 'name email')
+        .populate('approvalHistory.approvedBy', 'name email role');
         
       res.json(populatedProposal);
     } else {
@@ -339,6 +356,7 @@ const deleteProposal = async (req, res) => {
     if (proposal) {
       // Soft delete by changing status to rejected
       proposal.status = 'rejected';
+      proposal.approvalStatus = 'rejected';
       proposal.notes = proposal.notes
         ? `${proposal.notes}\n\nProposal marked as deleted on ${new Date().toISOString()}.`
         : `Proposal marked as deleted on ${new Date().toISOString()}.`;
@@ -376,6 +394,11 @@ const getProposalStats = async (req, res) => {
     const statusCounts = await Proposal.aggregate([
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
+    
+    // Get counts by approval status
+    const approvalStatusCounts = await Proposal.aggregate([
+      { $group: { _id: '$approvalStatus', count: { $sum: 1 } } },
+    ]);
 
     // Get trend of new proposals over time (last 6 months)
     const sixMonthsAgo = new Date();
@@ -412,6 +435,11 @@ const getProposalStats = async (req, res) => {
               $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] 
             } 
           },
+          adminApproved: {
+            $sum: {
+              $cond: [{ $eq: ['$approvalStatus', 'admin_approved'] }, 1, 0]
+            }
+          }
         },
       },
       {
@@ -419,9 +447,16 @@ const getProposalStats = async (req, res) => {
           _id: 0,
           total: 1,
           accepted: 1,
+          adminApproved: 1,
           conversionRate: { 
             $multiply: [
               { $divide: ['$accepted', '$total'] },
+              100
+            ]
+          },
+          approvalRate: {
+            $multiply: [
+              { $divide: ['$adminApproved', '$total'] },
               100
             ]
           }
@@ -452,14 +487,239 @@ const getProposalStats = async (req, res) => {
 
     res.json({
       statusCounts,
+      approvalStatusCounts,
       proposalsByMonth,
-      conversionRate: conversionRate.length > 0 ? conversionRate[0] : { total: 0, accepted: 0, conversionRate: 0 },
+      conversionRate: conversionRate.length > 0 ? conversionRate[0] : { 
+        total: 0, 
+        accepted: 0, 
+        adminApproved: 0,
+        conversionRate: 0,
+        approvalRate: 0
+      },
       systemSizeDistribution,
     });
   } catch (error) {
     console.error('Error fetching proposal stats:', error);
     res.status(500).json({
       message: 'Server error while fetching proposal stats'
+    });
+  }
+};
+
+// @desc    Submit proposal for approval
+// @route   POST /api/proposals/:id/submit
+// @access  Private
+const submitProposal = async (req, res) => {
+  try {
+    const proposal = await Proposal.findById(req.params.id);
+    
+    if (!proposal) {
+      res.status(404);
+      throw new Error('Proposal not found');
+    }
+    
+    // Check if user has permission to submit
+    if (!req.user.permissions?.proposal?.create && req.user.role !== 'admin') {
+      res.status(403);
+      throw new Error('Not authorized to submit proposals');
+    }
+    
+    // Update proposal status to submitted
+    await proposal.submitForApproval(req.user._id);
+    
+    // Return the updated proposal
+    const updatedProposal = await Proposal.findById(proposal._id)
+      .populate('lead', 'name email phone')
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role');
+    
+    res.status(200).json({ 
+      message: 'Proposal submitted successfully',
+      proposal: updatedProposal
+    });
+  } catch (error) {
+    console.error('Error submitting proposal:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error while submitting proposal'
+    });
+  }
+};
+
+// @desc    Manager approval for proposal
+// @route   POST /api/proposals/:id/manager-approve
+// @access  Private/Manager
+const managerApproveProposal = async (req, res) => {
+  try {
+    const { comments } = req.body;
+    const proposal = await Proposal.findById(req.params.id);
+    
+    if (!proposal) {
+      res.status(404);
+      throw new Error('Proposal not found');
+    }
+    
+    // Check if user has permission to approve
+    if (!req.user.permissions?.proposal?.approve && req.user.role !== 'admin') {
+      res.status(403);
+      throw new Error('Not authorized to approve proposals');
+    }
+    
+    // Check if proposal is in the right status
+    if (proposal.approvalStatus !== 'submitted') {
+      res.status(400);
+      throw new Error('Proposal is not submitted for approval');
+    }
+    
+    // Update proposal with manager approval
+    await proposal.approveByManager(req.user._id, comments);
+    
+    // Return the updated proposal
+    const updatedProposal = await Proposal.findById(proposal._id)
+      .populate('lead', 'name email phone')
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role');
+    
+    res.status(200).json({
+      message: 'Proposal approved by manager',
+      proposal: updatedProposal
+    });
+  } catch (error) {
+    console.error('Error approving proposal:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error while approving proposal'
+    });
+  }
+};
+
+// @desc    Final Admin approval for proposal
+// @route   POST /api/proposals/:id/admin-approve
+// @access  Private/Admin
+const adminApproveProposal = async (req, res) => {
+  try {
+    const { comments } = req.body;
+    const proposal = await Proposal.findById(req.params.id);
+    
+    if (!proposal) {
+      res.status(404);
+      throw new Error('Proposal not found');
+    }
+    
+    // Only admin can give final approval
+    if (!req.user.permissions?.proposal?.finalApprove) {
+      res.status(403);
+      throw new Error('Only admins can give final approval');
+    }
+    
+    // Check if proposal has manager approval
+    if (proposal.approvalStatus !== 'manager_approved') {
+      res.status(400);
+      throw new Error('Proposal needs manager approval first');
+    }
+    
+    // Update proposal with final admin approval
+    await proposal.finalApproveByAdmin(req.user._id, comments);
+    
+    // Return the updated proposal
+    const updatedProposal = await Proposal.findById(proposal._id)
+      .populate('lead', 'name email phone')
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role')
+      .populate('finalApproval.approvedBy', 'name email role');
+    
+    res.status(200).json({
+      message: 'Proposal received final approval',
+      proposal: updatedProposal
+    });
+  } catch (error) {
+    console.error('Error giving final approval:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error while approving proposal'
+    });
+  }
+};
+
+// @desc    Request adjustments to proposal
+// @route   POST /api/proposals/:id/request-adjustments
+// @access  Private/Manager or Admin
+const requestAdjustments = async (req, res) => {
+  try {
+    const { adjustments, comments } = req.body;
+    const proposal = await Proposal.findById(req.params.id);
+    
+    if (!proposal) {
+      res.status(404);
+      throw new Error('Proposal not found');
+    }
+    
+    // Check if user has permission to request changes
+    if (!req.user.permissions?.proposal?.approve && !req.user.permissions?.proposal?.finalApprove) {
+      res.status(403);
+      throw new Error('Not authorized to request adjustments');
+    }
+    
+    // Request adjustments
+    await proposal.requestAdjustments(req.user._id, adjustments);
+    
+    // Return the updated proposal
+    const updatedProposal = await Proposal.findById(proposal._id)
+      .populate('lead', 'name email phone')
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role')
+      .populate('adjustmentRequests.requestedBy', 'name email role');
+    
+    res.status(200).json({
+      message: 'Adjustment requests sent to proposal owner',
+      proposal: updatedProposal
+    });
+  } catch (error) {
+    console.error('Error requesting adjustments:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error while requesting adjustments'
+    });
+  }
+};
+
+// @desc    Implement requested adjustments
+// @route   POST /api/proposals/:id/implement-adjustments
+// @access  Private
+const implementAdjustments = async (req, res) => {
+  try {
+    const proposal = await Proposal.findById(req.params.id);
+    
+    if (!proposal) {
+      res.status(404);
+      throw new Error('Proposal not found');
+    }
+    
+    // Can only implement if there are pending adjustments
+    if (proposal.adjustmentRequests.filter(adj => adj.status === 'pending').length === 0) {
+      res.status(400);
+      throw new Error('No pending adjustment requests');
+    }
+    
+    // Update the proposal with implemented adjustments
+    await proposal.implementAdjustments(req.user._id);
+    
+    // Return the updated proposal
+    const updatedProposal = await Proposal.findById(proposal._id)
+      .populate('lead', 'name email phone')
+      .populate('customer', 'name email phone')
+      .populate('createdBy', 'name email')
+      .populate('approvalHistory.approvedBy', 'name email role')
+      .populate('adjustmentRequests.requestedBy', 'name email role');
+    
+    res.status(200).json({
+      message: 'Adjustments implemented successfully',
+      proposal: updatedProposal
+    });
+  } catch (error) {
+    console.error('Error implementing adjustments:', error);
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error while implementing adjustments'
     });
   }
 };
@@ -471,4 +731,9 @@ module.exports = {
   updateProposal,
   deleteProposal,
   getProposalStats,
+  submitProposal,
+  managerApproveProposal,
+  adminApproveProposal,
+  requestAdjustments,
+  implementAdjustments,
 };

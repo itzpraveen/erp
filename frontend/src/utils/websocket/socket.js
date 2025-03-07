@@ -2,13 +2,11 @@
  * WebSocket client for real-time communication
  */
 
-// Determine WebSocket URL based on environment
 const getWebSocketUrl = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = process.env.NODE_ENV === 'production' 
-    ? window.location.host 
-    : 'localhost:3001';
+  const host = window.location.host; // Use the same host as the page
   
+  // Production and Railway deployment: use same host
   return `${protocol}//${host}/ws`;
 };
 
@@ -21,19 +19,21 @@ let messageHandlers = [];
 
 // Initialize WebSocket connection
 const initSocket = () => {
+  // For development debugging, we can disable WebSocket completely if needed
+  if (sessionStorage.getItem('disableWebsocket') === 'true') {
+    return null;
+  }
+
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    console.log('WebSocket already connected or connecting');
     return socket;
   }
 
   try {
     const socketUrl = getWebSocketUrl();
-    console.log(`Connecting to WebSocket at ${socketUrl}`);
     
     socket = new WebSocket(socketUrl);
     
     socket.onopen = () => {
-      console.log('WebSocket connection established');
       reconnectAttempts = 0; // Reset reconnect attempts on successful connection
       
       // Send a ping to the server
@@ -43,22 +43,22 @@ const initSocket = () => {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('WebSocket message received:', data);
         
         // Notify all handlers
         messageHandlers.forEach(handler => handler(data));
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        // Silent error in production
       }
     };
     
     socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      // After reaching max attempts, disable WebSocket for this session
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS - 1) {
+        sessionStorage.setItem('disableWebsocket', 'true');
+      }
     };
     
     socket.onclose = (event) => {
-      console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
-      
       // Try to reconnect if not a deliberate closure
       if (event.code !== 1000) {
         scheduleReconnect();
@@ -67,7 +67,6 @@ const initSocket = () => {
     
     return socket;
   } catch (error) {
-    console.error('Error creating WebSocket connection:', error);
     scheduleReconnect();
     return null;
   }
@@ -81,21 +80,16 @@ const scheduleReconnect = () => {
   
   if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
     reconnectAttempts++;
-    console.log(`Scheduling WebSocket reconnection (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
     
     reconnectTimer = setTimeout(() => {
-      console.log('Attempting to reconnect WebSocket...');
       initSocket();
     }, RECONNECT_DELAY);
-  } else {
-    console.error(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`);
   }
 };
 
 // Send a message through the WebSocket
 const sendMessage = (message) => {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    console.error('WebSocket is not connected, cannot send message');
     return false;
   }
   
@@ -104,7 +98,6 @@ const sendMessage = (message) => {
     socket.send(messageString);
     return true;
   } catch (error) {
-    console.error('Error sending WebSocket message:', error);
     return false;
   }
 };

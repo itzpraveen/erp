@@ -1,0 +1,16 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && cd frontend && npm install && npm run build && cd ../backend && npm install"
+
+[deploy]
+startCommand = "cd backend && npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 5
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 10
+
+[env]
+NODE_ENV = "production"
+
+# Never define sensitive values like passwords or secrets here!
+# Use Railway's environment variables UI instead

@@ -1,23 +1,16 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
+import { useDispatch, useSelector } from 'react-redux';
+import { checkAuthStatus } from './features/auth/authSlice';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import WebSocketNotifications from './components/WebSocketNotifications';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import LeadsPage from './pages/LeadsPage';
-import LeadDetailsPage from './pages/LeadDetailsPage';
-import ProposalsPage from './pages/ProposalsPage';
-import ProposalDetailsPage from './pages/ProposalDetailsPage';
-import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailsPage from './pages/ProjectDetailsPage';
-import ServiceRequestsPage from './pages/ServiceRequestsPage';
-import ServiceRequestDetailsPage from './pages/ServiceRequestDetailsPage';
-import CustomersPage from './pages/CustomersPage';
-import CustomerDetailsPage from './pages/CustomerDetailsPage';
-import UsersPage from './pages/UsersPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoadingSpinner from './components/LoadingSpinner';
+
+// Import route configuration
+import { routeConfig } from './routes/RoutesConfig';
 
 // Styles
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -25,40 +18,82 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import './assets/styles/tenaga-theme.css';
 import './App.css';
 
+// Protected route component that handles authentication
+const ProtectedRoute = ({ element, adminOnly }) => {
+  const { isAuthenticated, userInfo } = useSelector((state) => state.auth);
+  
+  // Check if route requires admin access
+  if (adminOnly && (!userInfo || userInfo.role !== 'admin')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // Check if user is authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // User is authenticated, render the component
+  return element;
+};
+
 const App = () => {
+  const dispatch = useDispatch();
+  const { isCheckingAuth } = useSelector((state) => state.auth);
+  
+  // Check authentication status on app load
+  useEffect(() => {
+    dispatch(checkAuthStatus());
+  }, [dispatch]);
+  
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <Container className="d-flex justify-content-center align-items-center min-vh-100">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </Container>
+    );
+  }
+  
   return (
     <Router>
       <Header />
-      {/* WebSocket notifications are enabled for real-time updates */}
       <WebSocketNotifications />
       <main className="py-3">
         <Container>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/leads" element={<LeadsPage />} />
-
-            <Route path="/leads/create" element={<LeadDetailsPage mode="create" />} />
-            <Route path="/leads/:id" element={<LeadDetailsPage />} />
-            <Route path="/leads/:id/edit" element={<LeadDetailsPage mode="edit" />} />
-            <Route path="/proposals" element={<ProposalsPage />} />
-            <Route path="/proposals/create" element={<ProposalDetailsPage mode="create" />} />
-            <Route path="/proposals/:id" element={<ProposalDetailsPage />} />
-            <Route path="/proposals/:id/edit" element={<ProposalDetailsPage mode="edit" />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/create" element={<ProjectDetailsPage mode="create" />} />
-            <Route path="/projects/:id" element={<ProjectDetailsPage />} />
-            <Route path="/projects/:id/edit" element={<ProjectDetailsPage mode="edit" />} />
-            <Route path="/service-requests" element={<ServiceRequestsPage />} />
-            <Route path="/service-requests/create" element={<ServiceRequestDetailsPage mode="create" />} />
-            <Route path="/service-requests/:id" element={<ServiceRequestDetailsPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/customers/create" element={<CustomerDetailsPage mode="create" />} />
-            <Route path="/customers/:id" element={<CustomerDetailsPage />} />
-            <Route path="/customers/:id/edit" element={<CustomerDetailsPage mode="edit" />} />
-            <Route path="/users" element={<UsersPage />} />
-          </Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                {routeConfig.map((route) => {
+                  const RouteComponent = route.component;
+                  
+                  return (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={
+                        route.public ? (
+                          <RouteComponent {...(route.props || {})} />
+                        ) : (
+                          <ProtectedRoute 
+                            element={<RouteComponent {...(route.props || {})} />}
+                            adminOnly={route.adminOnly}
+                          />
+                        )
+                      }
+                    />
+                  );
+                })}
+                
+                {/* Fallback route for any unmatched routes */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/" replace />}
+                />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </Container>
       </main>
       <Footer />

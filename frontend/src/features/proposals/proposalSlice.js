@@ -29,7 +29,7 @@ export const getProposals = createAsyncThunk(
         params,
       };
 
-      const { data } = await api.get('/api/proposals', config);
+      const { data } = await api.get('/proposals', config);
       return data;
     } catch (error) {
       const message =
@@ -54,7 +54,7 @@ export const getProposalById = createAsyncThunk(
         },
       };
 
-      const { data } = await api.get(`/api/proposals/${id}`, config);
+      const { data } = await api.get(`/proposals/${id}`, config);
       return data;
     } catch (error) {
       const message =
@@ -80,7 +80,7 @@ export const createProposal = createAsyncThunk(
         },
       };
 
-      const { data } = await api.post('/api/proposals', proposalData, config);
+      const { data } = await api.post('/proposals', proposalData, config);
       return data;
     } catch (error) {
       const message =
@@ -106,7 +106,7 @@ export const updateProposal = createAsyncThunk(
         },
       };
 
-      const { data } = await api.put(`/api/proposals/${id}`, proposalData, config);
+      const { data } = await api.put(`/proposals/${id}`, proposalData, config);
       return data;
     } catch (error) {
       const message =
@@ -131,8 +131,158 @@ export const deleteProposal = createAsyncThunk(
         },
       };
 
-      await api.delete(`/api/proposals/${id}`, config);
+      await api.delete(`/proposals/${id}`, config);
       return id;
+    } catch (error) {
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Submit proposal for approval
+export const submitProposal = createAsyncThunk(
+  'proposals/submitProposal',
+  async ({ id, comments }, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post(
+        `/proposals/${id}/submit`,
+        { comments },
+        config
+      );
+      return data;
+    } catch (error) {
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Manager approval
+export const managerApproveProposal = createAsyncThunk(
+  'proposals/managerApprove',
+  async ({ id, comments }, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post(
+        `/proposals/${id}/manager-approve`,
+        { comments },
+        config
+      );
+      return data;
+    } catch (error) {
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Admin approval
+export const adminApproveProposal = createAsyncThunk(
+  'proposals/adminApprove',
+  async ({ id, comments }, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post(
+        `/proposals/${id}/admin-approve`,
+        { comments },
+        config
+      );
+      return data;
+    } catch (error) {
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Request adjustments
+export const requestAdjustments = createAsyncThunk(
+  'proposals/requestAdjustments',
+  async ({ id, adjustments, comments }, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post(
+        `/proposals/${id}/request-adjustments`,
+        { adjustments, comments },
+        config
+      );
+      return data;
+    } catch (error) {
+      const message =
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message;
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Implement adjustments
+export const implementAdjustments = createAsyncThunk(
+  'proposals/implementAdjustments',
+  async ({ id }, thunkAPI) => {
+    try {
+      const { userInfo } = thunkAPI.getState().auth;
+
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await api.post(
+        `/proposals/${id}/implement-adjustments`,
+        {},
+        config
+      );
+      return data;
     } catch (error) {
       const message =
         error.response && error.response.data.message
@@ -156,7 +306,7 @@ export const getProposalStats = createAsyncThunk(
         },
       };
 
-      const { data } = await api.get('/api/proposals/stats', config);
+      const { data } = await api.get('/proposals/stats', config);
       return data;
     } catch (error) {
       const message =
@@ -269,6 +419,106 @@ export const proposalSlice = createSlice({
         state.proposalStats = action.payload;
       })
       .addCase(getProposalStats.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Submit Proposal
+      .addCase(submitProposal.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(submitProposal.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.proposal = action.payload.proposal;
+        // Update in proposals array if it exists
+        if (state.proposals.length > 0) {
+          state.proposals = state.proposals.map((p) =>
+            p._id === action.payload.proposal._id ? action.payload.proposal : p
+          );
+        }
+      })
+      .addCase(submitProposal.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Manager Approve
+      .addCase(managerApproveProposal.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(managerApproveProposal.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.proposal = action.payload.proposal;
+        // Update in proposals array if it exists
+        if (state.proposals.length > 0) {
+          state.proposals = state.proposals.map((p) =>
+            p._id === action.payload.proposal._id ? action.payload.proposal : p
+          );
+        }
+      })
+      .addCase(managerApproveProposal.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Admin Approve
+      .addCase(adminApproveProposal.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(adminApproveProposal.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.proposal = action.payload.proposal;
+        // Update in proposals array if it exists
+        if (state.proposals.length > 0) {
+          state.proposals = state.proposals.map((p) =>
+            p._id === action.payload.proposal._id ? action.payload.proposal : p
+          );
+        }
+      })
+      .addCase(adminApproveProposal.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Request Adjustments
+      .addCase(requestAdjustments.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(requestAdjustments.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.proposal = action.payload.proposal;
+        // Update in proposals array if it exists
+        if (state.proposals.length > 0) {
+          state.proposals = state.proposals.map((p) =>
+            p._id === action.payload.proposal._id ? action.payload.proposal : p
+          );
+        }
+      })
+      .addCase(requestAdjustments.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      // Implement Adjustments
+      .addCase(implementAdjustments.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(implementAdjustments.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.proposal = action.payload.proposal;
+        // Update in proposals array if it exists
+        if (state.proposals.length > 0) {
+          state.proposals = state.proposals.map((p) =>
+            p._id === action.payload.proposal._id ? action.payload.proposal : p
+          );
+        }
+      })
+      .addCase(implementAdjustments.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

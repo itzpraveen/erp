@@ -21,22 +21,25 @@
   "dependencies": {
     "axios": "^1.8.1",
     "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
+    "express-validator": "^7.0.1",
     "helmet": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.11.0",
     "multer": "^1.4.5-lts.1",
-    "react-router-bootstrap": "^0.26.3",
     "redis": "^4.6.6",
     "express-session": "^1.17.3",
     "connect-redis": "^7.1.0",
-    "web-vitals": "^4.2.4",
     "ws": "^8.18.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }

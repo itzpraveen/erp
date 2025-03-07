@@ -1,31 +1,109 @@
+/**
+ * Custom error class for API errors
+ */
+class ApiError extends Error {
+  constructor(message, statusCode, errors = []) {
+    super(message);
+    this.statusCode = statusCode;
+    this.errors = errors;
+    this.name = this.constructor.name;
+    Error.captureStackTrace(this, this.constructor);
+  }
+
+  static badRequest(message, errors = []) {
+    return new ApiError(message, 400, errors);
+  }
+
+  static unauthorized(message = 'Unauthorized') {
+    return new ApiError(message, 401);
+  }
+
+  static forbidden(message = 'Forbidden') {
+    return new ApiError(message, 403);
+  }
+
+  static notFound(message = 'Resource not found') {
+    return new ApiError(message, 404);
+  }
+
+  static internalServer(message = 'Internal server error') {
+    return new ApiError(message, 500);
+  }
+}
+
+/**
+ * Middleware for handling 404 Not Found
+ */
 const notFound = (req, res, next) => {
-  const error = new Error(`Not Found - ${req.originalUrl}`);
-  res.status(404);
+  const error = ApiError.notFound(`Not Found - ${req.originalUrl}`);
   next(error);
 };
 
+/**
+ * Centralized error handling middleware
+ */
 const errorHandler = (err, req, res, next) => {
-  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  // Generate a unique request ID for tracking
+  const requestId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  
+  // Handle specific error types
+  if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    err = ApiError.badRequest('Invalid ID format');
+  }
+  
+  if (err.name === 'ValidationError') {
+    const errors = Object.values(err.errors).map(error => ({
+      field: error.path,
+      message: error.message
+    }));
+    err = ApiError.badRequest('Validation Error', errors);
+  }
+  
+  if (err.name === 'JsonWebTokenError') {
+    err = ApiError.unauthorized('Invalid token');
+  }
+  
+  if (err.name === 'TokenExpiredError') {
+    err = ApiError.unauthorized('Token expired');
+  }
+  
+  // Default status code handling
+  const statusCode = err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
   
   // Enhanced logging for server errors
-  if (statusCode === 500) {
-    console.error('SERVER ERROR:', {
+  const logLevel = statusCode >= 500 ? 'error' : 'warn';
+  if (logLevel === 'error') {
+    console.error(`[ERROR] [${requestId}]`, {
       method: req.method,
-      path: req.path,
-      body: req.body,
+      url: req.originalUrl,
+      body: process.env.NODE_ENV === 'production' ? '[REDACTED]' : req.body,
       params: req.params,
       query: req.query,
       error: err.message,
       stack: err.stack
     });
+  } else {
+    console.warn(`[WARN] [${requestId}]`, {
+      method: req.method,
+      url: req.originalUrl,
+      statusCode,
+      error: err.message
+    });
   }
   
-  res.status(statusCode);
-  res.json({
-    message: err.message,
-    stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    requestId: Date.now().toString(36) + Math.random().toString(36).substr(2) // Adds a request ID for tracking
+  // Send error response
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'An unexpected error occurred',
+    errors: err.errors || null,
+    requestId,
+    // Include stack trace in development
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
 };
 
-module.exports = { notFound, errorHandler };
+module.exports = { 
+  ApiError,
+  notFound, 
+  errorHandler 
+};

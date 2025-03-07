@@ -44,20 +44,37 @@ const Header = () => {
                   <LinkContainer to="/leads">
                     <Nav.Link className="fw-medium">Leads</Nav.Link>
                   </LinkContainer>
-                  <LinkContainer to="/proposals">
-                    <Nav.Link className="fw-medium">Proposals</Nav.Link>
-                  </LinkContainer>
+                  <NavDropdown title="Proposals" id="proposals-dropdown" className="fw-medium" active={window.location.pathname.includes('/proposals')}>
+                    <LinkContainer to="/proposals" exact>
+                      <NavDropdown.Item>All Proposals</NavDropdown.Item>
+                    </LinkContainer>
+                    {userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.permissions?.proposal?.approve) && (
+                      <LinkContainer to={{ pathname: "/proposals", search: "?approvalStatus=submitted" }}>
+                        <NavDropdown.Item>Pending Approvals</NavDropdown.Item>
+                      </LinkContainer>
+                    )}
+                    <LinkContainer to="/proposals/create">
+                      <NavDropdown.Item>Create New</NavDropdown.Item>
+                    </LinkContainer>
+                  </NavDropdown>
                   <LinkContainer to="/projects">
                     <Nav.Link className="fw-medium">Projects</Nav.Link>
                   </LinkContainer>
                   <LinkContainer to="/service-requests">
-                    <Nav.Link className="fw-medium">Service</Nav.Link>
+                    <Nav.Link className="fw-medium">Service Requests</Nav.Link>
                   </LinkContainer>
 
-                  {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
-                    <LinkContainer to="/users">
-                      <Nav.Link>Users</Nav.Link>
-                    </LinkContainer>
+                  {userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager') && (
+                    <NavDropdown title="Administration" id="admin-dropdown" className="fw-medium">
+                      <LinkContainer to="/users">
+                        <NavDropdown.Item>User List</NavDropdown.Item>
+                      </LinkContainer>
+                      {userInfo && userInfo.role === 'admin' && (
+                        <LinkContainer to="/user-management">
+                          <NavDropdown.Item>User Management</NavDropdown.Item>
+                        </LinkContainer>
+                      )}
+                    </NavDropdown>
                   )}
                   <NavDropdown title={<span><i className="fas fa-user-circle me-1"></i> {userInfo.name}</span>} id="username">
                     <LinkContainer to="/profile">

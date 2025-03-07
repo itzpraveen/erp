@@ -22,11 +22,10 @@
     "ws": "^8.18.1"
   },
   "scripts": {
-    "start": "BROWSER=none PORT=3001 HOST=0.0.0.0 react-scripts start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "debug": "BROWSER=none REACT_APP_DEBUG=true react-scripts start"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -34,7 +33,6 @@
       "react-app/jest"
     ]
   },
-  "proxy": "http://erp-backend:5001",
   "browserslist": {
     "production": [
       ">0.2%",
@@ -47,9 +45,12 @@
       "last 1 safari version"
     ]
   },
-  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "description": "Solar panel company ERP system frontend",
   "main": "index.js",
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }

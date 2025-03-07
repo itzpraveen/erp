@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../utils/api';
+import customerService from './customerService';
 
 const initialState = {
   customers: [],
@@ -21,22 +21,9 @@ export const getCustomers = createAsyncThunk(
   async (params = {}, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-        params,
-      };
-
-      const { data } = await api.get('/api/customers', config);
-      return data;
+      return await customerService.getCustomers(userInfo.token, params);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -47,21 +34,9 @@ export const getCustomerById = createAsyncThunk(
   async (id, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-      };
-
-      const { data } = await api.get(`/api/customers/${id}`, config);
-      return data;
+      return await customerService.getCustomerById(id, userInfo.token);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -72,22 +47,9 @@ export const createCustomer = createAsyncThunk(
   async (customerData, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-      };
-
-      const { data } = await api.post('/api/customers', customerData, config);
-      return data;
+      return await customerService.createCustomer(customerData, userInfo.token);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -98,22 +60,9 @@ export const updateCustomer = createAsyncThunk(
   async ({ id, customerData }, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-      };
-
-      const { data } = await api.put(`/api/customers/${id}`, customerData, config);
-      return data;
+      return await customerService.updateCustomer(id, customerData, userInfo.token);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -124,21 +73,9 @@ export const getCustomerHistory = createAsyncThunk(
   async (id, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-      };
-
-      const { data } = await api.get(`/api/customers/${id}/history`, config);
-      return data;
+      return await customerService.getCustomerHistory(id, userInfo.token);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -149,21 +86,9 @@ export const getCustomerStats = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const { userInfo } = thunkAPI.getState().auth;
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${userInfo.token}`,
-        },
-      };
-
-      const { data } = await api.get('/api/customers/stats', config);
-      return data;
+      return await customerService.getCustomerStats(userInfo.token);
     } catch (error) {
-      const message =
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message;
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );

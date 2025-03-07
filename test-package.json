@@ -1,0 +1,13 @@
+{
+  "name": "erp-backend-tester",
+  "version": "1.0.0",
+  "description": "Test script for ERP backend",
+  "main": "backend-test.js",
+  "scripts": {
+    "test": "node backend-test.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  },
+  "type": "module"
+}
