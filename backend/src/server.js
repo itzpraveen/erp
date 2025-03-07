@@ -12,8 +12,10 @@ const logger = require('./utils/logger');
 const httpLogger = require('./middleware/httpLoggerMiddleware');
 const corsMiddleware = require('./middleware/corsMiddleware');
 const dbStatusMiddleware = require('./middleware/dbStatusMiddleware');
+const requestTraceMiddleware = require('./middleware/requestTraceMiddleware');
+const securityHeadersMiddleware = require('./middleware/securityHeadersMiddleware');
 const { ApiError, notFound, errorHandler } = require('./middleware/errorMiddleware');
-const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rateLimitMiddleware');
+const { apiLimiter, authLimiter, adminLimiter, rateLimitMiddleware } = require('./middleware/rateLimitMiddleware');
 const userRoutes = require('./routes/userRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const proposalRoutes = require('./routes/proposalRoutes');
@@ -90,12 +92,21 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser()); // Parse cookies for auth
 
+// Add request tracing for production debugging (must be early in the middleware chain)
+app.use(requestTraceMiddleware);
+
+// Add security headers for production
+app.use(securityHeadersMiddleware);
+
 // Add HTTP logging middleware (with error handling)
 try {
   app.use(httpLogger);
 } catch (err) {
   logger.error('Failed to initialize HTTP logger middleware:', err);
 }
+
+// Add rate limit tracking middleware
+app.use(rateLimitMiddleware);
 
 // Apply rate limiting in production
 if (config.nodeEnv === 'production') {
