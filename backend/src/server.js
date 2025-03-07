@@ -31,6 +31,19 @@ logger.info(`Initializing server in ${config.nodeEnv} mode...`);
 // Create Express application
 const app = express();
 
+// =====================================
+// CRITICAL: HEALTH CHECK ENDPOINT
+// Must be registered before any middleware
+// This is used by Railway for deployment health checks
+// =====================================
+app.get('/health', (req, res) => {
+  // Simple response with no dependencies
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Enhanced CORS configuration for different environments
 const corsOptions = config.nodeEnv === 'production'
   ? {
@@ -113,18 +126,22 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Health check endpoint (no auth required)
-app.get('/health', (req, res) => {
+// Advanced health check endpoint with more details
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     memory: process.memoryUsage(),
-    env: config.nodeEnv
+    env: config.nodeEnv,
+    database: {
+      connected: mongoose.connection?.readyState === 1,
+      state: mongoose.connection?.readyState || 0
+    }
   });
 });
 
-// Health routes first (avoid auth middleware)
+// Health routes
 app.use('/api/health', healthRoutes);
 
 // Test routes for debugging (no auth required)
@@ -146,7 +163,13 @@ app.use('/api/enhanced-solar-calculator', enhancedSolarCalculatorRoutes);
 if (config.nodeEnv === 'production') {
   // Set static folder
   const frontendBuildPath = path.resolve(__dirname, '../../frontend/build');
-  app.use(express.static(frontendBuildPath));
+  
+  // Add cache control for static assets
+  app.use(express.static(frontendBuildPath, {
+    maxAge: '1d', // Cache for 1 day
+    etag: true,    // Use ETags
+    lastModified: true // Last-Modified header
+  }));
 
   // Serve index.html for any routes not defined above (React Router)
   app.get('*', (req, res) => {
@@ -167,7 +190,25 @@ app.use(errorHandler);
 const server = http.createServer(app);
 
 // Setup WebSocket server
-const wss = new WebSocket.Server({ server, path: '/ws' });
+const wss = new WebSocket.Server({ 
+  server, 
+  path: '/ws',
+  // Add these settings for more reliable connections
+  clientTracking: true,
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7,
+      level: 3
+    },
+    zlibInflateOptions: {
+      chunkSize: 10 * 1024
+    },
+    concurrencyLimit: 10,
+    threshold: 1024 // Size below which messages should not be compressed
+  }
+});
+
 logger.info('WebSocket server initialized');
 
 // WebSocket handling
@@ -207,29 +248,55 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     logger.info('WebSocket client disconnected', { ip: clientIp });
   });
+  
+  // Send ping to keep connection alive
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping();
+    } else {
+      clearInterval(pingInterval);
+    }
+  }, 30000); // 30 seconds
+  
+  // Clean up on close
+  ws.on('close', () => {
+    clearInterval(pingInterval);
+  });
 });
 
-// Connect to database and start server only after connection is established or failed
+// Flag to track if server is ready
+let serverReady = false;
+
+// Connect to database and start server
 (async () => {
+  let dbConnected = false;
+  
   try {
-    // Attempt to connect to the database with retry logic
-    await connectDB();
+    // Try to connect to the database but don't wait forever
+    // Use a timeout to ensure server starts even if DB connection hangs
+    const dbConnectPromise = connectDB();
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database connection timeout')), 20000)
+    );
     
-    // Start server after successful DB connection
+    await Promise.race([dbConnectPromise, timeout])
+      .then(() => {
+        dbConnected = true;
+        logger.info('Database connected successfully');
+      })
+      .catch(err => {
+        logger.error('Database connection failed or timed out', err);
+      });
+  } catch (err) {
+    logger.error('Failed to connect to database during startup', err);
+  }
+  
+  // Start server regardless of DB connection in production
+  if (dbConnected || config.nodeEnv === 'production') {
     startServer();
-  } catch (dbError) {
-    logger.error('Failed to connect to database during startup', dbError);
-    
-    // In production, proceed with starting the server even if DB connection fails
-    // This allows the application to recover when the database becomes available
-    if (config.nodeEnv === 'production') {
-      logger.warn('Starting server without database connection in production mode');
-      startServer();
-    } else {
-      // In development, exit to fix the connection issue
-      logger.error('Exiting due to database connection failure in development mode');
-      process.exit(1);
-    }
+  } else {
+    logger.error('Exiting due to database connection failure in development mode');
+    process.exit(1);
   }
 })();
 
@@ -237,11 +304,24 @@ wss.on('connection', (ws, req) => {
 function startServer() {
   const PORT = config.port;
   server.listen(PORT, () => {
+    serverReady = true;
     logger.info(`Server running in ${config.nodeEnv} mode on port ${PORT}`, {
       port: PORT,
       mode: config.nodeEnv
     });
     logger.info(`WebSocket server available at ws://localhost:${PORT}/ws`);
+    
+    // If db is not connected, try to reconnect in the background
+    if (mongoose.connection.readyState !== 1) {
+      logger.warn('Server started without database connection. Will retry in background.');
+      
+      // Try to reconnect to database in background
+      setTimeout(() => {
+        connectDB()
+          .then(() => logger.info('Background database connection successful'))
+          .catch(err => logger.error('Background database connection failed', err));
+      }, 10000); // Wait 10 seconds before trying again
+    }
   });
 }
 
