@@ -59,17 +59,28 @@ const createProject = async (req, res) => {
       if (leadData.address) {
         const parts = [];
         if (leadData.address.street) parts.push(leadData.address.street);
-      if (leadData.address.city) parts.push(leadData.address.city);
-      if (leadData.address.state) parts.push(leadData.address.state);
-      if (leadData.address.zipCode) parts.push(leadData.address.zipCode);
-      if (leadData.address.country) parts.push(leadData.address.country);
-      
-      if (parts.length > 0) {
-        formattedAddress = parts.join(', ');
+        if (leadData.address.city) parts.push(leadData.address.city);
+        if (leadData.address.state) parts.push(leadData.address.state);
+        if (leadData.address.zipCode) parts.push(leadData.address.zipCode);
+        if (leadData.address.country) parts.push(leadData.address.country);
+        
+        if (parts.length > 0) {
+          formattedAddress = parts.join(', ');
+        }
       }
-    }
     
     try {
+      // Validate required fields first
+      if (!leadData.name) {
+        return res.status(400).json({ message: 'Customer name is required' });
+      }
+      if (!leadData.email) {
+        return res.status(400).json({ message: 'Customer email is required' });
+      }
+      if (!leadData.phone) {
+        return res.status(400).json({ message: 'Customer phone is required' });
+      }
+
       console.log("Creating new customer from lead data:", {
         name: leadData.name,
         email: leadData.email,
@@ -89,8 +100,21 @@ const createProject = async (req, res) => {
       // Update lead status to closed_won
       await Lead.findByIdAndUpdate(leadData._id, { status: 'closed_won' });
     } catch (err) {
-      console.error("Error creating customer:", err.message);
-      return res.status(500).json({ message: 'Failed to create customer from lead data', error: err.message });
+      console.error("Error creating customer:", err);
+      
+      // Check for duplicate key error (likely email already exists)
+      if (err.code === 11000) {
+        return res.status(400).json({ 
+          message: 'A customer with this email already exists. Please use a different email or search for the existing customer.', 
+          error: 'Duplicate email' 
+        });
+      }
+      
+      return res.status(500).json({ 
+        message: 'Failed to create customer from lead data', 
+        error: err.message,
+        details: JSON.stringify(err)
+      });
     }
   }
 
@@ -98,17 +122,39 @@ const createProject = async (req, res) => {
   try {
     console.log("Creating project with customer ID:", customer._id);
     
-    const project = await Project.create({
+    // Validate required fields
+    if (!contractNumber) {
+      return res.status(400).json({ message: 'Contract number is required' });
+    }
+    
+    // Check if contract number is already in use
+    const existingContract = await Project.findOne({ contractNumber });
+    if (existingContract) {
+      return res.status(400).json({ 
+        message: 'This contract number is already in use. Please use a different contract number.',
+        error: 'Duplicate contract number'
+      });
+    }
+    
+    const projectData = {
       proposal: proposalId,
       customer: customer._id, // Use customer ID instead of lead ID
       contractNumber,
-      projectManager,
       timeline: {
         contractSigned: new Date(),
         installationStart: estimatedInstallDate,
       },
       status: 'planning',
-    });
+    };
+    
+    // Only add project manager if it's provided
+    if (projectManager) {
+      projectData.projectManager = projectManager;
+    }
+    
+    console.log("Creating project with data:", projectData);
+    
+    const project = await Project.create(projectData);
 
     if (project) {
       // Update customer's totalProjects count
@@ -125,12 +171,29 @@ const createProject = async (req, res) => {
       return res.status(400).json({ message: 'Invalid project data' });
     }
   } catch (err) {
-    console.error("Error creating project:", err.message);
-    return res.status(500).json({ message: 'Failed to create project', error: err.message });
+    console.error("Error creating project:", err);
+    
+    // Check for duplicate key error (likely duplicate contract number)
+    if (err.code === 11000) {
+      return res.status(400).json({ 
+        message: 'This contract number is already in use. Please use a different contract number.',
+        error: 'Duplicate contract number'
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: 'Failed to create project', 
+      error: err.message,
+      details: JSON.stringify(err)
+    });
   }
   } catch (error) {
-    console.error("Project creation error:", error.message);
-    return res.status(500).json({ message: 'Error creating project', error: error.message });
+    console.error("Project creation error:", error);
+    return res.status(500).json({ 
+      message: 'Error creating project', 
+      error: error.message,
+      details: error.stack
+    });
   }
 };
 

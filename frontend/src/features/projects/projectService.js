@@ -5,11 +5,21 @@ const API_URL = '/projects';
 // Error handling helper function
 const handleError = (error) => {
   console.error('Project service error:', error);
-  const message =
-    error.response && error.response.data.message
-      ? error.response.data.message
-      : error.message || 'Unknown error';
-  return message;
+  
+  // Handle detailed API error responses
+  if (error.response && error.response.data) {
+    const { message, error: errorMsg, details } = error.response.data;
+    
+    // Log detailed error information
+    if (details) {
+      console.error('Detailed error:', details);
+    }
+    
+    // Return the most specific error message available
+    return message || errorMsg || error.message || 'Unknown error';
+  }
+  
+  return error.message || 'Network error: Could not connect to server';
 };
 
 // Fetch all projects
