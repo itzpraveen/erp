@@ -3,11 +3,124 @@ const Proposal = require('../models/Proposal');
 const Customer = require('../models/Customer');
 const Lead = require('../models/Lead');
 
+// @desc    Create a project directly (without proposal)
+// @access  Private
+const createDirectProject = async (req, res) => {
+  try {
+    // Extract fields from the direct project creation request
+    const {
+      name,
+      customer,
+      contractNumber,
+      location,
+      type,
+      startDate,
+      targetCompletionDate,
+      capacity,
+      notes,
+      budget,
+      status,
+      progress,
+      createdBy
+    } = req.body;
+
+    console.log("Creating direct project for customer ID:", customer);
+
+    // Validate customer exists
+    const customerObj = await Customer.findById(customer);
+    if (!customerObj) {
+      console.error("Customer not found with ID:", customer);
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+
+    // Validate required fields
+    if (!contractNumber) {
+      return res.status(400).json({ message: 'Contract number is required' });
+    }
+    
+    // Check if contract number is already in use
+    const existingContract = await Project.findOne({ contractNumber });
+    if (existingContract) {
+      return res.status(400).json({ 
+        message: 'This contract number is already in use. Please use a different contract number.',
+        error: 'Duplicate contract number'
+      });
+    }
+
+    // Create a minimal project object that satisfies the schema
+    const projectData = {
+      customer: customer,
+      contractNumber: contractNumber,
+      status: status || 'planning',
+      timeline: {
+        contractSigned: startDate ? new Date(startDate) : new Date(),
+        installationStart: targetCompletionDate ? new Date(targetCompletionDate) : null,
+      },
+      notes: [{
+        text: notes || `Project created directly: ${name}`,
+        createdBy: req.user._id,
+        createdAt: new Date()
+      }]
+    };
+
+    // Only add project manager if the user is available
+    if (req.user && req.user._id) {
+      projectData.projectManager = req.user._id;
+    }
+    
+    console.log("Creating direct project with data:", projectData);
+    
+    const project = await Project.create(projectData);
+
+    if (project) {
+      // Update customer's totalProjects count
+      await Customer.findByIdAndUpdate(customer, { $inc: { totalProjects: 1 } });
+      
+      // Fully populate the project for response
+      const populatedProject = await Project.findById(project._id)
+        .populate('customer', 'name email phone')
+        .populate('projectManager', 'name email');
+        
+      return res.status(201).json(populatedProject);
+    } else {
+      return res.status(400).json({ message: 'Invalid project data' });
+    }
+  } catch (err) {
+    console.error("Error creating direct project:", err);
+    
+    // Check for duplicate key error
+    if (err.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Duplicate key error. Check if contract number is already used.',
+        error: 'Duplicate key'
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: 'Failed to create direct project', 
+      error: err.message,
+      details: JSON.stringify(err)
+    });
+  }
+};
+
 // @desc    Create a new project from an accepted proposal
 // @route   POST /api/projects
 // @access  Private/Admin or Manager
 const createProject = async (req, res) => {
   try {
+    // Log the entire request body for debugging
+    console.log("Project creation request body:", JSON.stringify(req.body, null, 2));
+
+    // Check if this is a direct project creation (without proposal)
+    if (!req.body.proposal && req.body.name) {
+      console.log("Detected direct project creation without proposal ID");
+      
+      // Handle direct project creation with mapping
+      return createDirectProject(req, res);
+    }
+    
+    // Continue with normal proposal-based project creation
     const {
       proposal: proposalId,
       contractNumber,
