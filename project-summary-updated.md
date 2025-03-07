@@ -222,7 +222,9 @@ services:
 
 ## Recent Changes
 ```
-[Current commit] - Simplify loader component to use only skeleton loading style
+[Current commit] - Add direct project creation adapter for backward compatibility
+[Previous commit] - Update project summary with recent UI and API fixes
+[Previous commit] - Simplify loader component to use only skeleton loading style
 [Previous commit] - Fix proposal to project conversion data format to match backend schema requirements
 [Previous commit] - Add modern loader components with skeleton and content placeholders
 [Previous commit] - Fix project API endpoint and improve loading animation
@@ -230,9 +232,6 @@ services:
 [Previous commit] - Fix project creation issues with existing customers
 [Previous commit] - Fix deployment issues: Add cacheRoute function and fix rate limiter deprecation warning
 [Previous commit] - Implement performance optimizations and fix ESLint warnings
-ab5ca8d - itzpraveen : Fix frontend serving: Move API status endpoint to /api to allow proper serving of React frontend
-d7027fd - itzpraveen : Fix missing seed-railway.js error by updating Railway TOML configuration
-979430a - itzpraveen : Fix Railway health check issues by improving startup reliability
 ```
 
 ## Known Issues and Solutions
@@ -256,6 +255,8 @@ d7027fd - itzpraveen : Fix missing seed-railway.js error by updating Railway TOM
 7. **Project-Proposal Data Schema Mismatch**: Resolved mismatches between the frontend and backend data models for project creation. Updated the proposal-to-project conversion to send the correct fields that match the backend schema requirements.
 
 8. **Loading Animation**: Replaced the basic spinner with a modern skeleton loader that provides a better user experience by showing a preview of the content structure during loading.
+
+9. **Direct Project Creation Compatibility**: Added backward compatibility adapter for direct project creation from the frontend. The adapter detects when projects are being created without a proposal reference and converts the data format to match the backend schema requirements.
 
 ## Performance Testing Notes
 * Dashboard page loading time improved by approximately 60%
