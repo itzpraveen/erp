@@ -1,0 +1,49 @@
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('./backend/src/models/User');
+
+// Connect to DB using environment variables
+const connectDB = async () => {
+  try {
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB Connected');
+    
+    // Check if admin user already exists
+    const adminExists = await User.findOne({ email: 'admin@example.com' });
+    
+    if (adminExists) {
+      console.log('Admin user already exists, skipping seeding');
+      return;
+    }
+    
+    // Create admin user
+    const adminUser = await User.create({
+      name: 'Admin User',
+      email: 'admin@example.com',
+      password: 'password123',
+      role: 'admin',
+    });
+    
+    // Create sales user
+    const salesUser = await User.create({
+      name: 'Sales User',
+      email: 'sales@example.com',
+      password: 'password123',
+      role: 'sales',
+    });
+    
+    console.log('Demo users created successfully');
+    console.log('Admin email: admin@example.com');
+    console.log('Admin password: password123');
+    console.log('Sales email: sales@example.com');
+    console.log('Sales password: password123');
+    
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  } finally {
+    mongoose.disconnect();
+  }
+};
+
+connectDB();
