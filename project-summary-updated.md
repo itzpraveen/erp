@@ -1,6 +1,6 @@
 # Project Summary: Solar Panel ERP System
 
-Updated on: Fri Mar 7 2025
+Updated on: Fri Mar 7 2025 - Updated Project Creation Process
 
 ## Project Structure
 ```
@@ -221,7 +221,8 @@ services:
 
 ## Recent Changes
 ```
-[Current commit] - Fix deployment issues: Add cacheRoute function and fix rate limiter deprecation warning
+[Current commit] - Fix project creation issues with existing customers
+[Previous commit] - Fix deployment issues: Add cacheRoute function and fix rate limiter deprecation warning
 [Previous commit] - Implement performance optimizations and fix ESLint warnings
 ab5ca8d - itzpraveen : Fix frontend serving: Move API status endpoint to /api to allow proper serving of React frontend
 d7027fd - itzpraveen : Fix missing seed-railway.js error by updating Railway TOML configuration
@@ -237,6 +238,13 @@ b4ec80f - itzpraveen : Add AI collaboration tools and documentation
 3. **Deprecated Rate Limiter Options**: The express-rate-limit library had deprecated the `onLimitReached` option. Fixed by updating to use the new API pattern with the standard `handler` function.
 
 4. **MongoDB Connection Performance**: Added indexes and optimized queries to improve database response times.
+
+5. **Project Creation Issues**: Fixed multiple issues in the project creation process:
+   - Address formatting bug in the lead-to-customer conversion logic
+   - Improved validation for customer creation with better error handling
+   - Added duplicate contract number detection
+   - Made the project manager field optional to prevent validation errors
+   - Enhanced error handling in both backend and frontend
 
 ## Performance Testing Notes
 * Dashboard page loading time improved by approximately 60%
