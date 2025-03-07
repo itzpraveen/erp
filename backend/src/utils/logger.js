@@ -11,6 +11,7 @@ const safeStringify = (obj) => {
   if (typeof obj === 'string') return obj;
   
   try {
+    const seen = new WeakSet(); // Move weakset inside to avoid persistence between calls
     return JSON.stringify(obj, (key, value) => {
       // Handle circular references
       if (typeof value === 'object' && value !== null) {
@@ -33,18 +34,17 @@ const colors = process.env.NODE_ENV !== 'production' ? {
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
-  magenta: '\x1b[35m'
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m'
 } : {
   reset: '',
   red: '',
   green: '',
   yellow: '',
   blue: '',
-  magenta: ''
+  magenta: '',
+  cyan: ''
 };
-
-// Set of already seen objects (for circular reference detection)
-const seen = new WeakSet();
 
 const logger = {
   /**
@@ -65,7 +65,7 @@ const logger = {
    * @param {Object} [meta] - Optional metadata
    */
   debug: (message, meta = {}) => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (process.env.NODE_ENV === 'production' && process.env.LOG_LEVEL !== 'debug') return;
     
     const timestamp = getTimestamp();
     const metaString = Object.keys(meta).length > 0 ? ` ${safeStringify(meta)}` : '';
@@ -102,6 +102,33 @@ const logger = {
     }
     
     console.error(`${colors.red}[ERROR]${colors.reset} ${timestamp} - ${message}${metaString}`);
+  },
+  
+  /**
+   * Log HTTP request/response
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {number} responseTime - Response time in milliseconds
+   */
+  http: (req, res, responseTime) => {
+    const timestamp = getTimestamp();
+    const statusCode = res.statusCode;
+    
+    // Color based on status code
+    let statusColor = colors.green; // 2xx
+    if (statusCode >= 400) {
+      statusColor = colors.red; // 4xx, 5xx
+    } else if (statusCode >= 300) {
+      statusColor = colors.yellow; // 3xx
+    }
+    
+    const logMessage = `${colors.cyan}[HTTP]${colors.reset} ${timestamp} - ${req.method} ${req.originalUrl} ${statusColor}${statusCode}${colors.reset} ${responseTime.toFixed(2)}ms`;
+    
+    if (statusCode >= 400) {
+      console.error(logMessage);
+    } else {
+      console.log(logMessage);
+    }
   }
 };
 

@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const WebSocket = require('ws');
+const mongoose = require('mongoose');
 const config = require('./config/config');
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
@@ -27,13 +28,7 @@ const healthRoutes = require('./routes/healthRoutes');
 // Initialize application
 logger.info(`Initializing server in ${config.nodeEnv} mode...`);
 
-// Connect to database
-connectDB().then(() => {
-  logger.info('Database connection established');
-}).catch(err => {
-  logger.error('Database connection failed', { error: err.message });
-});
-
+// Create Express application
 const app = express();
 
 // Enhanced CORS configuration for different environments
@@ -68,7 +63,7 @@ if (config.nodeEnv === 'production') {
   app.use(helmet.contentSecurityPolicy({
     directives: {
       defaultSrc: ["'self'"],
-      connectSrc: ["'self'", 'wss://', 'ws://'],
+      connectSrc: ["'self'", 'wss://*', 'ws://*', 'https://*'],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -81,13 +76,31 @@ if (config.nodeEnv === 'production') {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser()); // Parse cookies for auth
-app.use(httpLogger); // Log HTTP requests
+
+// Add HTTP logging middleware (with error handling)
+try {
+  app.use(httpLogger);
+} catch (err) {
+  logger.error('Failed to initialize HTTP logger middleware:', err);
+}
 
 // Apply rate limiting in production
 if (config.nodeEnv === 'production') {
   app.use('/api/', apiLimiter);
   app.use('/api/users/login', authLimiter); // Strict limits on login
 }
+
+// Add database status route
+app.get('/api/db-status', (req, res) => {
+  const connection = mongoose.connection || {};
+  res.json({
+    status: connection.readyState === 1 ? 'connected' : 'disconnected',
+    readyState: connection.readyState,
+    name: connection.name || 'none',
+    host: connection.host || 'none',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Debug endpoint to check API
 app.get('/api/status', (req, res) => {
@@ -100,7 +113,7 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -196,15 +209,41 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// Start server with proper error handling
-const PORT = config.port;
-server.listen(PORT, () => {
-  logger.info(`Server running in ${config.nodeEnv} mode on port ${PORT}`, {
-    port: PORT,
-    mode: config.nodeEnv
+// Connect to database and start server only after connection is established or failed
+(async () => {
+  try {
+    // Attempt to connect to the database with retry logic
+    await connectDB();
+    
+    // Start server after successful DB connection
+    startServer();
+  } catch (dbError) {
+    logger.error('Failed to connect to database during startup', dbError);
+    
+    // In production, proceed with starting the server even if DB connection fails
+    // This allows the application to recover when the database becomes available
+    if (config.nodeEnv === 'production') {
+      logger.warn('Starting server without database connection in production mode');
+      startServer();
+    } else {
+      // In development, exit to fix the connection issue
+      logger.error('Exiting due to database connection failure in development mode');
+      process.exit(1);
+    }
+  }
+})();
+
+// Function to start the server
+function startServer() {
+  const PORT = config.port;
+  server.listen(PORT, () => {
+    logger.info(`Server running in ${config.nodeEnv} mode on port ${PORT}`, {
+      port: PORT,
+      mode: config.nodeEnv
+    });
+    logger.info(`WebSocket server available at ws://localhost:${PORT}/ws`);
   });
-  logger.info(`WebSocket server available at ws://localhost:${PORT}/ws`);
-});
+}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
@@ -213,8 +252,11 @@ process.on('unhandledRejection', (err, promise) => {
     stack: err.stack
   });
   
-  // Close server & exit process
-  server.close(() => process.exit(1));
+  // Don't crash the server in production, but log the error
+  if (config.nodeEnv !== 'production') {
+    // Close server & exit process in development
+    server.close(() => process.exit(1));
+  }
 });
 
 // Handle uncaught exceptions
@@ -224,6 +266,9 @@ process.on('uncaughtException', (err) => {
     stack: err.stack
   });
   
-  // Close server & exit process
-  server.close(() => process.exit(1));
+  // Don't crash the server in production for all errors, but log them
+  if (config.nodeEnv !== 'production' || err.message.includes('FATAL')) {
+    // Close server & exit process
+    server.close(() => process.exit(1));
+  }
 });
