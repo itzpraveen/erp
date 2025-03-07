@@ -25,6 +25,7 @@ import { convertProposalToProject } from '../features/projects/projectSlice';
 import { getLeads } from '../features/leads/leadSlice';
 import { getLeadById } from '../features/leads/leadSlice';
 
+/* eslint-disable no-unused-vars */
 const ProposalDetailsPage = ({ mode }) => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -170,7 +171,7 @@ const ProposalDetailsPage = ({ mode }) => {
     }
   };
 
-  // Handle incentive field changes
+  // Handle incentive field changes - this is used in Financial tab which was removed from the simplified code
   const handleIncentiveChange = (e) => {
     const { name, value } = e.target;
     setNewIncentive(prev => ({
@@ -179,7 +180,7 @@ const ProposalDetailsPage = ({ mode }) => {
     }));
   };
 
-  // Function to add incentive
+  // Function to add incentive - this is used in Financial tab which was removed from the simplified code
   const handleAddIncentive = () => {
     if (newIncentive.name && newIncentive.amount) {
       setFormData(prevData => ({
@@ -204,7 +205,7 @@ const ProposalDetailsPage = ({ mode }) => {
     }
   };
 
-  // Function to remove incentive
+  // Function to remove incentive - this is used in Financial tab which was removed from the simplified code
   const handleRemoveIncentive = (index) => {
     setFormData(prevData => ({
       ...prevData,
@@ -218,7 +219,7 @@ const ProposalDetailsPage = ({ mode }) => {
     calculateNetCost();
   };
 
-  // Handle financing option field changes
+  // Handle financing option field changes - this is used in Financial tab which was removed from the simplified code
   const handleFinancingOptionChange = (e) => {
     const { name, value } = e.target;
     setNewFinancingOption(prev => ({
@@ -227,7 +228,7 @@ const ProposalDetailsPage = ({ mode }) => {
     }));
   };
 
-  // Function to add financing option
+  // Function to add financing option - this is used in Financial tab which was removed from the simplified code
   const handleAddFinancingOption = () => {
     if (newFinancingOption.name && newFinancingOption.termMonths) {
       setFormData(prevData => ({
@@ -258,7 +259,7 @@ const ProposalDetailsPage = ({ mode }) => {
     }
   };
 
-  // Function to remove financing option
+  // Function to remove financing option - this is used in Financial tab which was removed from the simplified code
   const handleRemoveFinancingOption = (index) => {
     setFormData(prevData => ({
       ...prevData,
@@ -268,6 +269,7 @@ const ProposalDetailsPage = ({ mode }) => {
       },
     }));
   };
+  /* eslint-enable no-unused-vars */
 
   // Handle total cost change - recalculate net cost
   useEffect(() => {
