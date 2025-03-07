@@ -10,7 +10,8 @@
     "dev": "./setup.sh dev",
     "prod": "./setup.sh prod",
     "backup": "./setup.sh backup",
-    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then npm run build; fi"
+    "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then npm run build; fi",
+    "railway:deploy": "node backend/src/server.js"
   },
   "keywords": [
     "solar",

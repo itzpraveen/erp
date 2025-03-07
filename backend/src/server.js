@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 const mongoose = require('mongoose');
 const config = require('./config/config');
 const connectDB = require('./config/db');
+const seedDatabase = require('./seed');
 const logger = require('./utils/logger');
 const httpLogger = require('./middleware/httpLoggerMiddleware');
 const corsMiddleware = require('./middleware/corsMiddleware');
@@ -278,7 +279,7 @@ wss.on('connection', (ws, req) => {
 // Flag to track if server is ready
 let serverReady = false;
 
-// Connect to database and start server
+// Connect to database, seed initial data if needed, and start server
 (async () => {
   let dbConnected = false;
   
@@ -291,9 +292,16 @@ let serverReady = false;
     );
     
     await Promise.race([dbConnectPromise, timeout])
-      .then(() => {
+      .then(async () => {
         dbConnected = true;
         logger.info('Database connected successfully');
+        
+        // Seed the database with initial admin user if needed
+        try {
+          await seedDatabase();
+        } catch (seedError) {
+          logger.error('Error seeding database:', seedError);
+        }
       })
       .catch(err => {
         logger.error('Database connection failed or timed out', err);
