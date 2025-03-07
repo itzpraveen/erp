@@ -41,8 +41,18 @@ const app = express();
 // =====================================
 app.get('/health', (req, res) => {
   // Simple response with no dependencies
+  console.log('Health check endpoint accessed at', new Date().toISOString());
   res.status(200).json({
     status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Register the same health check at the root path for redundancy
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'ERP API is running',
     timestamp: new Date().toISOString()
   });
 });
@@ -296,12 +306,11 @@ let serverReady = false;
         dbConnected = true;
         logger.info('Database connected successfully');
         
-        // Seed the database with initial admin user if needed
-        try {
-          await seedDatabase();
-        } catch (seedError) {
-          logger.error('Error seeding database:', seedError);
-        }
+        // Seed the database with initial admin user if needed (async, don't await)
+        // This allows the server to start faster without waiting for seeding
+        seedDatabase()
+          .then(() => logger.info('Database seeding completed successfully'))
+          .catch(seedError => logger.error('Error seeding database:', seedError));
       })
       .catch(err => {
         logger.error('Database connection failed or timed out', err);
@@ -321,7 +330,7 @@ let serverReady = false;
 
 // Function to start the server
 function startServer() {
-  const PORT = config.port;
+  const PORT = config.port || process.env.PORT || 5001;
   server.listen(PORT, () => {
     serverReady = true;
     logger.info(`Server running in ${config.nodeEnv} mode on port ${PORT}`, {
@@ -329,6 +338,8 @@ function startServer() {
       mode: config.nodeEnv
     });
     logger.info(`WebSocket server available at ws://localhost:${PORT}/ws`);
+    // Log an explicit message about health endpoint
+    logger.info(`Health check endpoint available at http://localhost:${PORT}/health`);
     
     // If db is not connected, try to reconnect in the background
     if (mongoose.connection.readyState !== 1) {
