@@ -21,7 +21,7 @@ const DataTable = ({
   // State for sorting, filtering, and pagination
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [filters, setFilters] = useState({});
+  // Removed unused state variables for filters
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(defaultItemsPerPage);
   const [filterText, setFilterText] = useState('');

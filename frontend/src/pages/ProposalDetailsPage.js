@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { downloadProposalPdf } from '../utils/pdf/generateProposalPdf';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -21,8 +21,7 @@ import {
   getProposalById, 
   resetProposal, 
   createProposal, 
-  updateProposal,
-  addProposalDocument 
+  updateProposal 
 } from '../features/proposals/proposalSlice';
 import { convertProposalToProject } from '../features/projects/projectSlice';
 import { getLeads } from '../features/leads/leadSlice';
@@ -82,7 +81,7 @@ const ProposalDetailsPage = ({ mode }) => {
   });
 
   const { userInfo } = useSelector((state) => state.auth);
-  const { proposal, isLoading, isError, isSuccess, message } = useSelector(
+  const { proposal, isLoading, isError, message } = useSelector(
     (state) => state.proposals
   );
   const { lead, leads } = useSelector((state) => state.leads);
@@ -125,6 +124,25 @@ const ProposalDetailsPage = ({ mode }) => {
       setFormData(proposalData);
     }
   }, [proposal, isCreateMode]);
+
+  // Function to calculate net cost
+  const calculateNetCost = useCallback(() => {
+    const totalCost = parseFloat(formData.financialDetails.totalCost) || 0;
+    const incentivesTotal = formData.financialDetails.incentives.reduce(
+      (acc, incentive) => acc + (parseFloat(incentive.amount) || 0), 
+      0
+    );
+    
+    const netCost = totalCost - incentivesTotal;
+    
+    setFormData(prevData => ({
+      ...prevData,
+      financialDetails: {
+        ...prevData.financialDetails,
+        netCost,
+      },
+    }));
+  }, [formData.financialDetails.totalCost, formData.financialDetails.incentives]);
 
   // Function to handle basic field changes
   const handleChange = (e) => {
@@ -236,25 +254,6 @@ const ProposalDetailsPage = ({ mode }) => {
     }));
   };
 
-  // Function to calculate net cost
-  const calculateNetCost = () => {
-    const totalCost = parseFloat(formData.financialDetails.totalCost) || 0;
-    const incentivesTotal = formData.financialDetails.incentives.reduce(
-      (acc, incentive) => acc + (parseFloat(incentive.amount) || 0), 
-      0
-    );
-    
-    const netCost = totalCost - incentivesTotal;
-    
-    setFormData(prevData => ({
-      ...prevData,
-      financialDetails: {
-        ...prevData.financialDetails,
-        netCost,
-      },
-    }));
-  };
-
   // Handle incentive field changes
   const handleIncentiveChange = (e) => {
     const { name, value } = e.target;
@@ -278,7 +277,7 @@ const ProposalDetailsPage = ({ mode }) => {
     if (formData.financialDetails.totalCost) {
       calculateNetCost();
     }
-  }, [formData.financialDetails.totalCost]);
+  }, [formData.financialDetails.totalCost, calculateNetCost]);
 
   // Handle form submission
   const handleSubmit = (e) => {
@@ -444,7 +443,7 @@ const ProposalDetailsPage = ({ mode }) => {
                                 No leads found. <Link to="/leads/new">Create a new lead</Link> first.
                               </Alert>
                             )}
-                          </>
+                            </>
                           ) : (
                             <Form.Control 
                               type="text" 
@@ -597,269 +596,6 @@ const ProposalDetailsPage = ({ mode }) => {
                     </Card>
                   </Tab.Pane>
 
-                  {/* Financial Details Tab */}
-                  <Tab.Pane eventKey="financial">
-                    <Card className="mb-4">
-                      <Card.Header>Financial Details</Card.Header>
-                      <Card.Body>
-                        <Row>
-                          <Col md={9}>
-                            <Form.Group controlId="financialDetails.totalCost" className="mb-3">
-                              <Form.Label>Total System Cost (₹)</Form.Label>
-                              <Form.Control
-                                type="number"
-                                step="0.01"
-                                placeholder="Enter total system cost"
-                                name="financialDetails.totalCost"
-                                value={formData.financialDetails.totalCost}
-                                onChange={handleChange}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={3}>
-                            <Form.Group controlId="financialDetails.currency" className="mb-3">
-                              <Form.Label>Currency</Form.Label>
-                              <Form.Select
-                                name="financialDetails.currency"
-                                value={formData.financialDetails.currency || 'INR'}
-                                onChange={handleChange}
-                              >
-                                <option value="INR">₹ INR</option>
-                                <option value="USD">$ USD</option>
-                                <option value="EUR">€ EUR</option>
-                                <option value="GBP">£ GBP</option>
-                              </Form.Select>
-                            </Form.Group>
-                          </Col>
-                        </Row>
-
-                        <Form.Group controlId="incentives" className="mb-3">
-                          <Form.Label>Incentives & Rebates</Form.Label>
-                          <Card>
-                            <Card.Body>
-                              <Row className="mb-2">
-                                <Col md={5}>
-                                  <Form.Control
-                                    type="text"
-                                    placeholder="Incentive name"
-                                    name="name"
-                                    value={newIncentive.name}
-                                    onChange={handleIncentiveChange}
-                                  />
-                                </Col>
-                                <Col md={5}>
-                                  <Form.Control
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Amount"
-                                    name="amount"
-                                    value={newIncentive.amount}
-                                    onChange={handleIncentiveChange}
-                                  />
-                                </Col>
-                                <Col md={2}>
-                                  <Button 
-                                    variant="primary" 
-                                    onClick={handleAddIncentive}
-                                    className="w-100"
-                                  >
-                                    Add
-                                  </Button>
-                                </Col>
-                              </Row>
-
-                              {formData.financialDetails.incentives.length > 0 ? (
-                                <Table striped bordered hover>
-                                  <thead>
-                                    <tr>
-                                      <th>Incentive</th>
-                                      <th>Amount</th>
-                                      <th>Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {formData.financialDetails.incentives.map((incentive, index) => (
-                                      <tr key={index}>
-                                        <td>{incentive.name}</td>
-                                        <td>{formatCurrency(incentive.amount)}</td>
-                                        <td>
-                                          <Button 
-                                            variant="danger" 
-                                            size="sm"
-                                            onClick={() => handleRemoveIncentive(index)}
-                                          >
-                                            Remove
-                                          </Button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </Table>
-                              ) : (
-                                <p className="text-muted">No incentives added</p>
-                              )}
-                            </Card.Body>
-                          </Card>
-                        </Form.Group>
-
-                        <Row>
-                          <Col md={6}>
-                            <Form.Group controlId="financialDetails.netCost" className="mb-3">
-                              <Form.Label>Net Cost (after incentives)</Form.Label>
-                              <Form.Control
-                                type="number"
-                                step="0.01"
-                                placeholder="Calculated automatically"
-                                name="financialDetails.netCost"
-                                value={formData.financialDetails.netCost}
-                                onChange={handleChange}
-                                disabled
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={6}>
-                            <Form.Group controlId="financialDetails.paybackPeriod" className="mb-3">
-                              <Form.Label>Estimated Payback Period (years)</Form.Label>
-                              <Form.Control
-                                type="number"
-                                step="0.1"
-                                placeholder="Enter payback period in years"
-                                name="financialDetails.paybackPeriod"
-                                value={formData.financialDetails.paybackPeriod}
-                                onChange={handleChange}
-                              />
-                            </Form.Group>
-                          </Col>
-                        </Row>
-
-                        <Form.Group controlId="financingOptions" className="mb-3">
-                          <Form.Label>Financing Options</Form.Label>
-                          <Card>
-                            <Card.Body>
-                              <Row className="mb-2">
-                                <Col md={4}>
-                                  <Form.Control
-                                    type="text"
-                                    placeholder="Option name"
-                                    name="name"
-                                    value={newFinancingOption.name}
-                                    onChange={handleFinancingOptionChange}
-                                    className="mb-2"
-                                  />
-                                </Col>
-                                <Col md={4}>
-                                  <Form.Control
-                                    type="number"
-                                    placeholder="Term (months)"
-                                    name="termMonths"
-                                    value={newFinancingOption.termMonths}
-                                    onChange={handleFinancingOptionChange}
-                                    className="mb-2"
-                                  />
-                                </Col>
-                                <Col md={4}>
-                                  <Form.Control
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Monthly payment"
-                                    name="monthlyPayment"
-                                    value={newFinancingOption.monthlyPayment}
-                                    onChange={handleFinancingOptionChange}
-                                    className="mb-2"
-                                  />
-                                </Col>
-                              </Row>
-                              <Row className="mb-2">
-                                <Col md={4}>
-                                  <Form.Control
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Interest rate (%)"
-                                    name="interestRate"
-                                    value={newFinancingOption.interestRate}
-                                    onChange={handleFinancingOptionChange}
-                                  />
-                                </Col>
-                                <Col md={4}>
-                                  <Form.Control
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Down payment"
-                                    name="downPayment"
-                                    value={newFinancingOption.downPayment}
-                                    onChange={handleFinancingOptionChange}
-                                  />
-                                </Col>
-                                <Col md={4}>
-                                  <Button 
-                                    variant="primary" 
-                                    onClick={handleAddFinancingOption}
-                                    className="w-100"
-                                  >
-                                    Add Option
-                                  </Button>
-                                </Col>
-                              </Row>
-
-                              {formData.financialDetails.financingOptions.length > 0 ? (
-                                <>
-                                  <Table striped bordered hover>
-                                    <thead>
-                                      <tr>
-                                        <th>Option</th>
-                                        <th>Term</th>
-                                        <th>Monthly</th>
-                                        <th>Rate</th>
-                                        <th>Action</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {formData.financialDetails.financingOptions.map((option, index) => (
-                                        <tr key={index}>
-                                          <td>{option.name}</td>
-                                          <td>{option.termMonths} months</td>
-                                          <td>{formatCurrency(option.monthlyPayment)}</td>
-                                          <td>{option.interestRate}%</td>
-                                          <td>
-                                            <Button 
-                                              variant="danger" 
-                                              size="sm"
-                                              onClick={() => handleRemoveFinancingOption(index)}
-                                            >
-                                              Remove
-                                            </Button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </Table>
-
-                                  <Form.Group controlId="financialDetails.selectedFinancing" className="mt-3">
-                                    <Form.Label>Selected Financing Option</Form.Label>
-                                    <Form.Select
-                                      name="financialDetails.selectedFinancing"
-                                      value={formData.financialDetails.selectedFinancing}
-                                      onChange={handleChange}
-                                    >
-                                      <option value="">Select default option</option>
-                                      {formData.financialDetails.financingOptions.map((option, index) => (
-                                        <option key={index} value={option.name}>
-                                          {option.name} - {option.termMonths} months at {option.interestRate}%
-                                        </option>
-                                      ))}
-                                    </Form.Select>
-                                  </Form.Group>
-                                </>
-                              ) : (
-                                <p className="text-muted">No financing options added</p>
-                              )}
-                            </Card.Body>
-                          </Card>
-                        </Form.Group>
-                      </Card.Body>
-                    </Card>
-                  </Tab.Pane>
-
                   {/* Notes Tab */}
                   <Tab.Pane eventKey="notes">
                     <Card className="mb-4">
@@ -946,7 +682,7 @@ const ProposalDetailsPage = ({ mode }) => {
                     if (window.confirm('Convert this accepted proposal to a project? This will create a new project with details from this proposal.')) {
                       dispatch(convertProposalToProject(proposal._id))
                         .unwrap()
-                        .then((project) => {
+                        .then(() => {
                           alert('Project created successfully!');
                           navigate('/projects');
                         })
@@ -981,324 +717,6 @@ const ProposalDetailsPage = ({ mode }) => {
               )}
             </Col>
           </Row>
-
-          <Tab.Container id="proposal-view-tabs" defaultActiveKey="details">
-            <Row>
-              <Col md={3}>
-                <Card className="mb-3">
-                  <Card.Header>Lead Information</Card.Header>
-                  <ListGroup variant="flush">
-                    <ListGroup.Item>
-                      <strong>Name:</strong>{' '}
-                      {proposal.lead ? (
-                        <Link to={`/leads/${proposal.lead._id}`}>
-                          {proposal.lead.name}
-                        </Link>
-                      ) : (
-                        'N/A'
-                      )}
-                    </ListGroup.Item>
-                    {proposal.lead && proposal.lead.email && (
-                      <ListGroup.Item>
-                        <strong>Email:</strong>{' '}
-                        <a href={`mailto:${proposal.lead.email}`}>{proposal.lead.email}</a>
-                      </ListGroup.Item>
-                    )}
-                    {proposal.lead && proposal.lead.phone && (
-                      <ListGroup.Item>
-                        <strong>Phone:</strong>{' '}
-                        <a href={`tel:${proposal.lead.phone}`}>{proposal.lead.phone}</a>
-                      </ListGroup.Item>
-                    )}
-                    {proposal.lead && proposal.lead.status && (
-                      <ListGroup.Item>
-                        <strong>Lead Status:</strong>{' '}
-                        <Badge bg={
-                          proposal.lead.status === 'closed_won' ? 'success' :
-                          proposal.lead.status === 'closed_lost' ? 'danger' :
-                          proposal.lead.status === 'proposal' ? 'info' :
-                          proposal.lead.status === 'qualified' ? 'primary' :
-                          'secondary'
-                        }>
-                          {proposal.lead.status.replace('_', ' ')}
-                        </Badge>
-                      </ListGroup.Item>
-                    )}
-                  </ListGroup>
-                </Card>
-
-                <Card className="mb-3">
-                  <Card.Header>Proposal Info</Card.Header>
-                  <ListGroup variant="flush">
-                    <ListGroup.Item>
-                      <strong>Created:</strong>{' '}
-                      {new Date(proposal.createdAt).toLocaleDateString()}
-                    </ListGroup.Item>
-                    <ListGroup.Item>
-                      <strong>Created By:</strong>{' '}
-                      {proposal.createdBy ? proposal.createdBy.name : 'N/A'}
-                    </ListGroup.Item>
-                    {proposal.estimatedInstallDate && (
-                      <ListGroup.Item>
-                        <strong>Install Date:</strong>{' '}
-                        {new Date(proposal.estimatedInstallDate).toLocaleDateString()}
-                      </ListGroup.Item>
-                    )}
-                    <ListGroup.Item>
-                      <strong>Version:</strong> {proposal.version || 1}
-                    </ListGroup.Item>
-                    {proposal.convertedToProject && (
-                      <ListGroup.Item>
-                        <strong>Converted to Project:</strong>{' '}
-                        <Badge bg="success">Yes</Badge>{' '}
-                        {proposal.projectId && (
-                          <Button 
-                            variant="link" 
-                            size="sm" 
-                            onClick={() => navigate(`/projects/${proposal.projectId}`)}
-                          >
-                            View Project
-                          </Button>
-                        )}
-                      </ListGroup.Item>
-                    )}
-                  </ListGroup>
-                </Card>
-
-                <Nav variant="pills" className="flex-column mb-3">
-                  <Nav.Item>
-                    <Nav.Link eventKey="details">System Details</Nav.Link>
-                  </Nav.Item>
-                  <Nav.Item>
-                    <Nav.Link eventKey="financial">Financial Details</Nav.Link>
-                  </Nav.Item>
-                  {proposal.notes && (
-                    <Nav.Item>
-                      <Nav.Link eventKey="notes">Notes</Nav.Link>
-                    </Nav.Item>
-                  )}
-                  {proposal.documents && proposal.documents.length > 0 && (
-                    <Nav.Item>
-                      <Nav.Link eventKey="documents">Documents</Nav.Link>
-                    </Nav.Item>
-                  )}
-                </Nav>
-              </Col>
-              <Col md={9}>
-                <Tab.Content>
-                  <Tab.Pane eventKey="details">
-                    <Card>
-                      <Card.Header>System Details</Card.Header>
-                      <Card.Body>
-                        {proposal.systemDetails ? (
-                          <Row>
-                            <Col md={6}>
-                              <ListGroup variant="flush">
-                                <ListGroup.Item>
-                                  <strong>Total Capacity:</strong>{' '}
-                                  {proposal.systemDetails.totalCapacity ? `${proposal.systemDetails.totalCapacity} kW` : 'N/A'}
-                                </ListGroup.Item>
-                                <ListGroup.Item>
-                                  <strong>Panel Type:</strong>{' '}
-                                  {proposal.systemDetails.panelType || 'N/A'}
-                                </ListGroup.Item>
-                                <ListGroup.Item>
-                                  <strong>Panel Count:</strong>{' '}
-                                  {proposal.systemDetails.panelCount || 'N/A'}
-                                </ListGroup.Item>
-                                <ListGroup.Item>
-                                  <strong>Inverter Type:</strong>{' '}
-                                  {proposal.systemDetails.inverterType || 'N/A'}
-                                </ListGroup.Item>
-                              </ListGroup>
-                            </Col>
-                            <Col md={6}>
-                              <ListGroup variant="flush">
-                                <ListGroup.Item>
-                                  <strong>Estimated Production:</strong>{' '}
-                                  {proposal.systemDetails.estimatedProduction ? `${proposal.systemDetails.estimatedProduction} kWh/year` : 'N/A'}
-                                </ListGroup.Item>
-                                <ListGroup.Item>
-                                  <strong>Battery Storage:</strong>{' '}
-                                  {proposal.systemDetails.batteryStorage ? 'Yes' : 'No'}
-                                </ListGroup.Item>
-                                {proposal.systemDetails.batteryStorage && (
-                                  <ListGroup.Item>
-                                    <strong>Battery Capacity:</strong>{' '}
-                                    {proposal.systemDetails.batteryCapacity ? `${proposal.systemDetails.batteryCapacity} kWh` : 'N/A'}
-                                  </ListGroup.Item>
-                                )}
-                              </ListGroup>
-                            </Col>
-                          </Row>
-                        ) : (
-                          <p>No system details available</p>
-                        )}
-                      </Card.Body>
-                    </Card>
-                  </Tab.Pane>
-
-                  <Tab.Pane eventKey="financial">
-                    <Card>
-                      <Card.Header>Financial Details</Card.Header>
-                      <Card.Body>
-                        {proposal.financialDetails ? (
-                          <>
-                            <Row className="mb-4">
-                              <Col md={4}>
-                                <Card className="text-center h-100">
-                                  <Card.Body>
-                                    <Card.Title>Total Cost</Card.Title>
-                                    <h3>
-                                      {proposal.financialDetails.totalCost
-                                        ? formatCurrency(proposal.financialDetails.totalCost)
-                                        : 'N/A'}
-                                    </h3>
-                                  </Card.Body>
-                                </Card>
-                              </Col>
-                              <Col md={4}>
-                                <Card className="text-center h-100">
-                                  <Card.Body>
-                                    <Card.Title>Net Cost</Card.Title>
-                                    <h3>
-                                      {proposal.financialDetails.netCost
-                                        ? formatCurrency(proposal.financialDetails.netCost)
-                                        : 'N/A'}
-                                    </h3>
-                                    <small className="text-muted">After incentives</small>
-                                  </Card.Body>
-                                </Card>
-                              </Col>
-                              <Col md={4}>
-                                <Card className="text-center h-100">
-                                  <Card.Body>
-                                    <Card.Title>Payback Period</Card.Title>
-                                    <h3>
-                                      {proposal.financialDetails.paybackPeriod
-                                        ? `${proposal.financialDetails.paybackPeriod} years`
-                                        : 'N/A'}
-                                    </h3>
-                                  </Card.Body>
-                                </Card>
-                              </Col>
-                            </Row>
-
-                            {proposal.financialDetails.incentives && proposal.financialDetails.incentives.length > 0 && (
-                              <Card className="mb-4">
-                                <Card.Header>Incentives & Rebates</Card.Header>
-                                <Card.Body>
-                                  <Table striped bordered>
-                                    <thead>
-                                      <tr>
-                                        <th>Incentive</th>
-                                        <th>Amount</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {proposal.financialDetails.incentives.map((incentive, index) => (
-                                        <tr key={index}>
-                                          <td>{incentive.name}</td>
-                                          <td>{formatCurrency(incentive.amount)}</td>
-                                        </tr>
-                                      ))}
-                                      <tr className="table-primary">
-                                        <td><strong>Total Incentives</strong></td>
-                                        <td><strong>
-                                          {formatCurrency(proposal.financialDetails.incentives.reduce(
-                                            (sum, incentive) => sum + (parseFloat(incentive.amount) || 0), 0
-                                          ))}
-                                        </strong></td>
-                                      </tr>
-                                    </tbody>
-                                  </Table>
-                                </Card.Body>
-                              </Card>
-                            )}
-
-                            {proposal.financialDetails.financingOptions && proposal.financialDetails.financingOptions.length > 0 && (
-                              <Card>
-                                <Card.Header>Financing Options</Card.Header>
-                                <Card.Body>
-                                  <Table striped bordered>
-                                    <thead>
-                                      <tr>
-                                        <th>Option</th>
-                                        <th>Term</th>
-                                        <th>Monthly Payment</th>
-                                        <th>Interest Rate</th>
-                                        <th>Down Payment</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {proposal.financialDetails.financingOptions.map((option, index) => (
-                                        <tr key={index} className={
-                                          proposal.financialDetails.selectedFinancing === option.name
-                                            ? 'table-success'
-                                            : ''
-                                        }>
-                                          <td>
-                                            {option.name}
-                                            {proposal.financialDetails.selectedFinancing === option.name && (
-                                              <Badge bg="success" className="ms-2">Recommended</Badge>
-                                            )}
-                                          </td>
-                                          <td>{option.termMonths} months</td>
-                                          <td>{formatCurrency(option.monthlyPayment)}</td>
-                                          <td>{option.interestRate}%</td>
-                                          <td>{formatCurrency(option.downPayment)}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </Table>
-                                </Card.Body>
-                              </Card>
-                            )}
-                          </>
-                        ) : (
-                          <p>No financial details available</p>
-                        )}
-                      </Card.Body>
-                    </Card>
-                  </Tab.Pane>
-
-                  {proposal.notes && (
-                    <Tab.Pane eventKey="notes">
-                      <Card>
-                        <Card.Header>Notes & Additional Information</Card.Header>
-                        <Card.Body>
-                          <Card.Text style={{ whiteSpace: 'pre-line' }}>
-                            {proposal.notes}
-                          </Card.Text>
-                        </Card.Body>
-                      </Card>
-                    </Tab.Pane>
-                  )}
-
-                  {proposal.documents && proposal.documents.length > 0 && (
-                    <Tab.Pane eventKey="documents">
-                      <Card>
-                        <Card.Header>Documents</Card.Header>
-                        <ListGroup variant="flush">
-                          {proposal.documents.map((doc, index) => (
-                            <ListGroup.Item key={index}>
-                              <i className="fas fa-file me-2"></i>
-                              <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                                {doc.name}
-                              </a>
-                              <Badge bg="secondary" className="ms-2">
-                                {doc.fileType}
-                              </Badge>
-                            </ListGroup.Item>
-                          ))}
-                        </ListGroup>
-                      </Card>
-                    </Tab.Pane>
-                  )}
-                </Tab.Content>
-              </Col>
-            </Row>
-          </Tab.Container>
         </>
       ) : (
         <Message variant="danger">Proposal not found</Message>

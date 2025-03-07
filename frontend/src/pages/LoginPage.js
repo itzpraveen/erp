@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Button, Alert, Card } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
+// Removed unused import
 import api from '../utils/api';
 import Message from '../components/Message';
 import Loader from '../components/Loader';

@@ -27,7 +27,7 @@ const LeadsPage = () => {
   const dispatch = useDispatch();
 
   const { userInfo } = useSelector((state) => state.auth);
-  const { leads, page, pages, isLoading, isError, message, isSuccess } = useSelector(
+  const { leads, page, pages, isLoading, isError, message } = useSelector(
     (state) => state.leads
   );
 

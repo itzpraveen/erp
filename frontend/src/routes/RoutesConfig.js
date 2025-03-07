@@ -1,4 +1,5 @@
-import React, { lazy } from 'react';
+import { lazy } from 'react';
+// Removed unused import React
 
 // Define route configurations with metadata
 // This approach allows for:

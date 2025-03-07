@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Row, Col, Card, Form, Button, Alert, Nav, Tab, Table, Badge, ListGroup } from 'react-bootstrap';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
-import { formatAddress, formatDate, formatDateTime, formatStatus } from '../utils/formatters';
+import { formatAddress, formatDate, formatStatus } from '../utils/formatters';
 import { getProjectById, resetProject, createProject, updateProject } from '../features/projects/projectSlice';
 import { getCustomers } from '../features/customers/customerSlice';
 
@@ -16,10 +16,10 @@ const ProjectDetailsPage = ({ mode }) => {
   
   const isCreateMode = mode === 'create';
   const isEditMode = mode === 'edit';
-  const isViewMode = !isCreateMode && !isEditMode;
+  // Removed unused variable isViewMode
   
   // Redux state
-  const { project, isLoading: projectLoading, isError, isSuccess, message } = useSelector(
+  const { project, isLoading: projectLoading, isError, message } = useSelector(
     (state) => state.projects
   );
   const { customers, isLoading: customersLoading } = useSelector(

@@ -1,11 +1,35 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Toast, ToastContainer } from 'react-bootstrap';
 import { initSocket, addMessageHandler, removeMessageHandler } from '../utils/websocket/socket';
 
 const WebSocketNotifications = () => {
   const [notifications, setNotifications] = useState([]);
-  const [showConnectionErrors, setShowConnectionErrors] = useState(false); // Don't show connection errors by default
+  // Removed unused state variables for showConnectionErrors
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Create the addNotification function with useCallback to prevent dependency issues
+  const addNotification = useCallback((notification) => {
+    const newNotification = {
+      id: Date.now(),
+      title: notification.title,
+      message: notification.message,
+      timestamp: new Date().toISOString(),
+      type: notification.type
+    };
+    
+    // Add the notification to state
+    setNotifications(prev => [...prev, newNotification]);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      dismissNotification(newNotification.id);
+    }, 5000);
+  }, []);
+  
+  // Dismiss a notification
+  const dismissNotification = useCallback((id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
   
   useEffect(() => {
     // Don't try to initialize websocket if disabled
@@ -60,30 +84,7 @@ const WebSocketNotifications = () => {
     return () => {
       removeMessageHandler(handleWebSocketMessage);
     };
-  }, [isConnected]);
-
-  const addNotification = (notification) => {
-    const newNotification = {
-      id: Date.now(),
-      title: notification.title,
-      message: notification.message,
-      timestamp: new Date().toISOString(),
-      type: notification.type
-    };
-    
-    // Add the notification to state
-    setNotifications(prev => [...prev, newNotification]);
-    
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-      dismissNotification(newNotification.id);
-    }, 5000);
-  };
-  
-  // Dismiss a notification
-  const dismissNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, [isConnected, addNotification]);
   
   // Get Bootstrap variant based on notification type
   const getVariant = (type) => {

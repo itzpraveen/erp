@@ -17,19 +17,7 @@ export const generateProposalPdf = async (proposal, companyName = 'Tenaga Solar'
   document.body.appendChild(pdfContent);
 
   try {
-    // Format currency
-    const formatCurrency = (amount) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-      }).format(amount);
-    };
-
-    // Format date
-    const formatDate = (dateString) => {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString();
-    };
+    // Removed unused format helpers
 
     // Render PDF content with styled HTML
     pdfContent.innerHTML = `
@@ -123,7 +111,4 @@ export const downloadProposalPdf = async (proposal, companyName) => {
   }
 };
 
-export default {
-  generateProposalPdf,
-  downloadProposalPdf
-};
+export default { generateProposalPdf, downloadProposalPdf };

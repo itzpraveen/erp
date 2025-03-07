@@ -43,7 +43,7 @@ const LeadDetailsPage = ({ mode }) => {
   });
 
   const { userInfo } = useSelector((state) => state.auth);
-  const { lead, isLoading, isError, isSuccess, message } = useSelector(
+  const { lead, isLoading, isError, message } = useSelector(
     (state) => state.leads
   );
 

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { normalizePath } from './apiUtils';
+// Removed unused import: normalizePath
 
 // Figure out base URL based on environment
 const getBaseUrl = () => {
